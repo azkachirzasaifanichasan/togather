@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Primary Purple */
+  --purple-primary: #7960D7;
+  --purple-hover: #6A51C8;
+  --purple-light: #9B8BE3;
+
+  /* Dark Grays */
+  --dark-bg: #1F2937;
+  --dark-text: #111827;
+
+  /* Gray Scale */
+  --gray-600: #6B7280;
+  --gray-500: #9CA3AF;
+  --gray-400: #D1D5DB;
+  --gray-300: #E5E7EB;
+  --gray-200: #F3F4F6;
+
+  /* Semantic Colors */
+  --success: #10B981;
+  --error: #EF4444;
+  --warning: #F59E0B;
+}
+
 @layer base {
   * {
     @apply box-border p-0 m-0;

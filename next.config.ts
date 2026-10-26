@@ -4,7 +4,12 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.1.46'],
   output: "standalone",
   images: {
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
   },
 };
 
