@@ -1,35 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const session = await auth();
+    const { id } = await params;
+
+    if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    // Get user from session
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    const communityId = params.id;
+    const communityId = id;
 
     // Check if community exists and is approved
     const community = await prisma.community.findUnique({
@@ -59,7 +48,7 @@ export async function POST(
       where: {
         communityId_userId: {
           communityId,
-          userId: user.id,
+          userId: session.user.id,
         }
       }
     });
@@ -77,7 +66,7 @@ export async function POST(
       const membership = await prisma.communityMembership.create({
         data: {
           communityId,
-          userId: user.id,
+          userId: session.user.id,
         }
       });
 
@@ -92,7 +81,7 @@ export async function POST(
         where: {
           communityId_userId: {
             communityId,
-            userId: user.id,
+            userId: session.user.id,
           }
         }
       });
@@ -107,7 +96,7 @@ export async function POST(
       const joinRequest = await prisma.communityJoinRequest.create({
         data: {
           communityId,
-          userId: user.id,
+          userId: session.user.id,
           status: "PENDING",
         }
       });

@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { redirect, notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -10,10 +10,6 @@ export default async function CommunityProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const session = await auth();
-  
-  if (!session) {
-    redirect('/login');
-  }
 
   const { id } = await params;
 
@@ -68,33 +64,38 @@ export default async function CommunityProfilePage({
     .map(ec => ec.event)
     .filter(event => event.isPublished && new Date(event.startDate) >= now)
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-  
+
   // Get admin from first organizer
   const admin = community.organizers[0]?.user;
 
-  const isMember = community.members.some(m => m.userId === session.user.id);
+  // Check membership only if logged in
+  const isMember = session
+    ? community.members.some(m => m.userId === session.user.id)
+    : false;
 
-  // Get user's communities for sidebar
-  const userCommunities = await prisma.communityMembership.findMany({
-    where: { userId: session.user.id },
-    include: {
-      community: {
+  // Get user's communities for sidebar only if logged in
+  const userCommunities = session
+    ? await prisma.communityMembership.findMany({
+        where: { userId: session.user.id },
         include: {
-          _count: {
-            select: { members: true }
+          community: {
+            include: {
+              _count: {
+                select: { members: true }
+              }
+            }
           }
-        }
-      }
-    },
-    take: 4
-  });
+        },
+        take: 4
+      })
+    : [];
 
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/discovery" className="flex items-center gap-2">
+          <Link href={session ? "/discovery" : "/landing"} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#7960D7] rounded-lg flex items-center justify-center p-1">
               <Image
                 src="/logo-togather.png"
@@ -106,9 +107,9 @@ export default async function CommunityProfilePage({
             </div>
             <span className="text-xl font-bold text-gray-900">Togather</span>
           </Link>
-          
-          <Link 
-            href="/discovery" 
+
+          <Link
+            href={session ? "/discovery" : "/landing"}
             className="flex items-center gap-2 px-4 py-2 bg-[#7960D7] text-white rounded-lg hover:bg-[#6850C7] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,11 +132,17 @@ export default async function CommunityProfilePage({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             </button>
-            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-semibold">
-                {session.user.name?.charAt(0).toUpperCase() || 'A'}
-              </span>
-            </div>
+            {session?.user ? (
+              <Link href="/profile" className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
+                <span className="text-white font-semibold">
+                  {session.user.name?.charAt(0).toUpperCase() || 'A'}
+                </span>
+              </Link>
+            ) : (
+              <Link href="/login" className="px-4 py-2 text-[#7960D7] hover:bg-[#7960D7] hover:bg-opacity-10 rounded-full font-medium transition-colors">
+                Log in
+              </Link>
+            )}
           </div>
         </div>
       </header>
