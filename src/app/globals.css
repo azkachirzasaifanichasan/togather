@@ -1,13 +1,11 @@
 @import "tailwindcss";
 
-@theme {
+:root {
   --color-primary: #7960d7;
   --color-primary-light: #9d8ce6;
   --color-dark: #1f2937;
   --color-muted: #6b7280;
   --color-panel: #f9fafb;
-  
-  --font-sans: var(--font-inter), system-ui, sans-serif;
   
   --radius-pill: 9999px;
   --radius-panel: 2rem;
@@ -29,7 +27,7 @@ body {
 body {
   color: var(--color-dark);
   background: white;
-  font-family: var(--font-sans);
+  font-family: var(--font-inter), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
