@@ -8,24 +8,47 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     
     // Parse filters from query params
-    const filters = {
-      categories: searchParams.getAll("categories"),
-      distance: searchParams.get("distance")
-        ? parseFloat(searchParams.get("distance")!)
-        : undefined,
-      userLat: searchParams.get("userLat")
-        ? parseFloat(searchParams.get("userLat")!)
-        : undefined,
-      userLng: searchParams.get("userLng")
-        ? parseFloat(searchParams.get("userLng")!)
-        : undefined,
-      area: searchParams.get("area") || undefined,
-      type: searchParams.get("type") as any,
-      accessType: searchParams.get("accessType") as any,
-    };
+    const filters: any = {};
+    
+    const categories = searchParams.getAll("categories");
+    if (categories.length > 0) {
+      filters.categories = categories;
+    }
+    
+    const distance = searchParams.get("distance");
+    if (distance) {
+      filters.distance = parseFloat(distance);
+    }
+    
+    const userLat = searchParams.get("userLat");
+    if (userLat) {
+      filters.userLat = parseFloat(userLat);
+    }
+    
+    const userLng = searchParams.get("userLng");
+    if (userLng) {
+      filters.userLng = parseFloat(userLng);
+    }
+    
+    const area = searchParams.get("area");
+    if (area) {
+      filters.area = area;
+    }
+    
+    const type = searchParams.get("type");
+    if (type) {
+      filters.type = type;
+    }
+    
+    const accessType = searchParams.get("accessType");
+    if (accessType) {
+      filters.accessType = accessType;
+    }
 
-    // Validate filters
-    const validatedFilters = discoveryFilterSchema.parse(filters);
+    // Validate filters only if there are any
+    const validatedFilters = Object.keys(filters).length > 0 
+      ? discoveryFilterSchema.parse(filters) 
+      : {};
 
     const communities = await getDiscoveryCommunities(validatedFilters);
 
