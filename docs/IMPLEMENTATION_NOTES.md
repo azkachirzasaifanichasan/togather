@@ -149,7 +149,52 @@ Original misspelled folder `docs/refrence/` preserved; working copies in `docs/r
 ---
 
 ## Import Report
-*(To be written after seed execution)*
+
+### Seed Execution Summary
+**Date:** 2026-10-26  
+**Status:** ✅ Successful
+
+**Demo Accounts Created:**
+- Admin: `admin@togather.demo` / `demo123456`
+- Verified User: `user@togather.demo` / `demo123456`
+- Incomplete User: `incomplete@togather.demo` / `demo123456`
+- Organizer: `organizer@togather.demo` / `demo123456`
+
+**DEMO Communities:** 11 total
+- Covers all 5 DIY areas (Kota Yogyakarta, Sleman, Bantul, Kulon Progo, Gunungkidul)
+- All 10 PRD interest categories represented
+- Includes PRD 12.2 minimum scenarios:
+  1. ✅ Offline public with location (Jogja Runners Club)
+  2. ✅ Offline private with location (Sleman Photography Circle)
+  3. ✅ Online public without location (DIY Tech Community)
+  4. ✅ Online private without location (Mental Health Support DIY)
+  5. ✅ Pending submission (Bantul Organic Farming)
+  6. ✅ Approved submission (multiple communities)
+  7. ✅ Rejected submission (Spam Community Test)
+
+**DEMO Events:** 5 total
+- 4 upcoming events (relative to seed date)
+- 1 past event for testing history
+- Includes PRD 12.2 scenarios:
+  8. ✅ Standalone event (Tech Startup Networking Night)
+  9. ✅ Event with related community (Jogja Marathon → Jogja Runners Club)
+  10. ✅ Event with on-platform registration open (Jogja Marathon, quota=100)
+  11. ✅ Full quota event (Full Quota Event Demo, quota=2 - to be filled in tests)
+
+**Reference Data Import:**
+- Status: Not implemented in seed script (placeholder noted)
+- Reason: Import requires full URL validation, duplicate detection, date parsing from DIY_Events_2026.md
+- All reference data would be marked `dataSource: REFERENCE_UNVERIFIED` with visible UI label
+- Geographic gaps filled by DEMO data
+
+**Empty Result Scenario (PRD 12.2 #12):**
+- Filter combination: `categories=[KEAGAMAAN]` + `area=GUNUNGKIDUL` + `type=ONLINE`
+- Expected result: 0 communities (verified in query tests)
+
+**PostGIS Implementation:**
+- Communities and Events store `geography(Point,4326)` coordinates
+- Seed uses raw SQL `ST_GeographyFromText` for coordinate insertion
+- Distance queries will use `ST_Distance` and `ST_DWithin` (implemented in service layer)
 
 ---
 
