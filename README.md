@@ -1,3 +1,6 @@
+# GIT PULL DULU SEBELUM MEMBUAT DAN SEBELUM NGEPUSH PROJECT WOI
+
+
 # 🤝 Togather
 
 **Togather** adalah platform discovery untuk komunitas dan event lokal di Yogyakarta dan sekitarnya (DIY - Daerah Istimewa Yogyakarta). Platform ini memudahkan pengguna untuk menemukan, bergabung dengan komunitas, dan mengikuti berbagai acara sesuai minat mereka.
