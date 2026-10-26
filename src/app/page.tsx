@@ -51,10 +51,13 @@ export default function DiscoveryPage() {
       const commData = await commRes.json();
       const eventData = await eventRes.json();
 
-      setCommunities(commData);
-      setEvents(eventData);
+      // Ensure data is array
+      setCommunities(Array.isArray(commData) ? commData : []);
+      setEvents(Array.isArray(eventData) ? eventData : []);
     } catch (error) {
       console.error("Failed to fetch data:", error);
+      setCommunities([]);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
