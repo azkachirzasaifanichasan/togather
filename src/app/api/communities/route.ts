@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     
-    // Parse filters from query params
+    // Parse filters from query params - only include if present
     const filters: any = {};
     
     const categories = searchParams.getAll("categories");
@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(communities);
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error("Validation error:", error.errors);
       return NextResponse.json(
         { error: "Invalid filters", details: error.errors },
         { status: 400 }
