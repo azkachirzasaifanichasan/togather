@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import { AccountMenu } from '@/components/AccountMenu';
 import Image from 'next/image';
 
 export default async function KomunitasPage() {
@@ -80,11 +81,14 @@ export default async function KomunitasPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             </button>
-            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-semibold">
-                {session.user.name?.charAt(0).toUpperCase() || 'A'}
-              </span>
-            </div>
+            <AccountMenu
+              initialUser={{
+                name: session.user.name || session.user.email || 'User',
+                email: session.user.email,
+                avatarUrl: null,
+                isAdmin: session.user.isAdmin ?? false,
+              }}
+            />
           </div>
         </div>
       </header>

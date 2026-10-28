@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
-import { UpdateProfileInput } from "@/lib/validations";
+import { UpdateProfileInput, CompleteProfileInput } from "@/lib/validations";
 
 /**
  * Create a new user account.
@@ -45,8 +45,32 @@ export async function updateUserProfile(
       name: data.name,
       phone: data.phone,
       domicile: data.domicile,
+      address: data.address,
       interests: data.interests,
       bio: data.bio,
+    },
+  });
+}
+
+/**
+ * Complete the organizer gate: profile only needs phone + domicile + address,
+ * but interests/bio/name are left as they were.
+ */
+export async function completeUserProfile(
+  userId: string,
+  data: CompleteProfileInput
+) {
+  return await prisma.userProfile.update({
+    where: { userId },
+    data: {
+      name: data.name,
+      phone: data.phone,
+      domicile: data.domicile,
+      address: data.address,
+      // An empty uploader value means "leave the existing photo alone".
+      ...(data.avatarUrl ? { avatarUrl: data.avatarUrl } : {}),
+      ...(data.interests ? { interests: data.interests } : {}),
+      ...(data.bio !== undefined ? { bio: data.bio || null } : {}),
     },
   });
 }

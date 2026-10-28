@@ -2,7 +2,9 @@ import { auth } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import { AccountMenu } from '@/components/AccountMenu';
 import Image from 'next/image';
+import { joinCommunity, leaveCommunity } from '@/server/membership';
 
 export default async function CommunityProfilePage({
   params,
@@ -10,7 +12,7 @@ export default async function CommunityProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const session = await auth();
-  
+
   if (!session) {
     redirect('/login');
   }
@@ -74,6 +76,25 @@ export default async function CommunityProfilePage({
 
   const isMember = community.members.some(m => m.userId === session.user.id);
 
+  // Membership changes need the resolved community id, so they are defined here.
+  async function toggleMembership() {
+    'use server';
+    const { id } = await params;
+    const session = await auth();
+    if (!session?.user?.id) redirect('/login');
+
+    try {
+      if (isMember) {
+        await leaveCommunity(session.user.id, id);
+      } else {
+        await joinCommunity(session.user.id, id);
+      }
+    } catch (e) {
+      redirect(`/komunitas/${id}?error=` + encodeURIComponent((e as Error).message));
+    }
+    redirect(`/komunitas/${id}`);
+  }
+
   // Get user's communities for sidebar
   const userCommunities = await prisma.communityMembership.findMany({
     where: { userId: session.user.id },
@@ -131,11 +152,14 @@ export default async function CommunityProfilePage({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             </button>
-            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-semibold">
-                {session.user.name?.charAt(0).toUpperCase() || 'A'}
-              </span>
-            </div>
+            <AccountMenu
+              initialUser={{
+                name: session.user.name || session.user.email || 'User',
+                email: session.user.email,
+                avatarUrl: null,
+                isAdmin: session.user.isAdmin ?? false,
+              }}
+            />
           </div>
         </div>
       </header>
@@ -245,9 +269,14 @@ export default async function CommunityProfilePage({
                 {community.description}
               </p>
             </div>
-            <button className="px-6 py-3 bg-gray-900 text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors">
-              {isMember ? 'Leave community' : 'Join community'}
-            </button>
+            <form action={toggleMembership}>
+              <button
+                type="submit"
+                className="px-6 py-3 bg-gray-900 text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors"
+              >
+                {isMember ? 'Leave community' : 'Join community'}
+              </button>
+            </form>
           </div>
 
           {/* Stats */}

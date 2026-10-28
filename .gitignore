@@ -56,3 +56,5 @@ logs/
 
 # documentation (private design files)
 /docs/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

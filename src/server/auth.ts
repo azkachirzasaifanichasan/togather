@@ -29,24 +29,16 @@ export async function getAccountContext(): Promise<AccountContext> {
   const userId = session.user.id;
   const isAdmin = session.user.isAdmin;
 
-  // Check profile completeness
   const profile = await prisma.userProfile.findUnique({
     where: { userId },
   });
 
-  const isComplete =
-    profile &&
-    profile.name &&
-    profile.phone &&
-    profile.domicile &&
-    profile.interests.length > 0 &&
-    profile.bio;
-
-  const status: AccountStatus =
-    isComplete && profile.phoneVerifiedAt ? "VERIFIED" : "INCOMPLETE";
+  // Operator/organizer is not a stored role: it is what a user becomes once
+  // their profile is complete (verified phone + domicile + address).
+  const isComplete = !!(profile?.phoneVerifiedAt && profile.domicile && profile.address);
 
   return {
-    status,
+    status: isComplete ? "VERIFIED" : "INCOMPLETE",
     userId,
     isAdmin,
     isOrganizer: async (communityId: string) => {

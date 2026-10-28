@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 export default function EventDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetch(`/api/events/${params.id}`)
@@ -20,6 +23,30 @@ export default function EventDetailPage() {
         setLoading(false);
       });
   }, [params.id]);
+
+  const handleRegister = async () => {
+    setRegistering(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/events/${params.id}/rsvp`, { method: "POST" });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Gagal mendaftar event");
+        return;
+      }
+      // Re-fetch so the quota counter and button state reflect the registration.
+      const refreshed = await fetch(`/api/events/${params.id}`);
+      setEvent(await refreshed.json());
+    } catch {
+      setError("Gagal mendaftar event");
+    } finally {
+      setRegistering(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -103,16 +130,21 @@ export default function EventDetailPage() {
             </div>
           </div>
 
+          {error && (
+            <p className="mb-4 text-sm text-red-600 text-center">{error}</p>
+          )}
+
           {event.isRegistered ? (
             <button className="w-full px-6 py-3 rounded-[--radius-pill] bg-gray-300 text-[--color-dark] font-medium">
               Sudah Terdaftar
             </button>
           ) : canRegister ? (
-            <button 
-              onClick={() => alert("Fitur registrasi memerlukan login. Implementasi lengkap di route handler dengan auth.")}
-              className="w-full px-6 py-3 rounded-[--radius-pill] bg-[--color-dark] text-white font-medium hover:opacity-90"
+            <button
+              onClick={handleRegister}
+              disabled={registering}
+              className="w-full px-6 py-3 rounded-[--radius-pill] bg-[--color-dark] text-white font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Daftar Event
+              {registering ? "Mendaftar..." : "Daftar Event"}
             </button>
           ) : isFull ? (
             <button className="w-full px-6 py-3 rounded-[--radius-pill] bg-gray-300 text-[--color-dark] font-medium cursor-not-allowed">

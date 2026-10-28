@@ -7,6 +7,10 @@ const prisma = new PrismaClient();
 
 const SEED_PASSWORD = process.env.SEED_DEMO_PASSWORD || "demo123456";
 
+// Fixed credentials for the admin account (per product requirement)
+const ADMIN_EMAIL = "Togather@gmail.com";
+const ADMIN_PASSWORD = "Togather30";
+
 // Centroid coordinates for each DIY area (approximate)
 const AREA_CENTROIDS: Record<Area, { lat: number; lng: number }> = {
   KOTA_YOGYAKARTA: { lat: -7.7956, lng: 110.3695 },
@@ -36,20 +40,24 @@ async function main() {
 
   console.log("✅ Cleared existing data");
 
-  // Create demo accounts
+  // Create the three accounts that map to the three roles.
+  // "Operator" is not a stored role: it is a user whose profile is complete
+  // (verified phone + domicile + address). Admin is the isAdmin flag.
+  const adminPasswordHash = await hash(ADMIN_PASSWORD, 10);
   const passwordHash = await hash(SEED_PASSWORD, 10);
 
   const admin = await prisma.user.create({
     data: {
-      email: "admin@togather.demo",
-      passwordHash,
+      email: ADMIN_EMAIL,
+      passwordHash: adminPasswordHash,
       isAdmin: true,
       profile: {
         create: {
           name: "Admin Togather",
           phone: "+6281234567890",
           phoneVerifiedAt: new Date(),
-          domicile: "KOTA_YOGYAKARTA",
+          domicile: Area.KOTA_YOGYAKARTA,
+          address: "Jl. Malioboro No. 1, Kota Yogyakarta",
           interests: [InterestCategory.TEKNOLOGI],
           bio: "Administrator platform Togather.",
         },
@@ -57,53 +65,17 @@ async function main() {
     },
   });
 
-  const verifiedUser = await prisma.user.create({
+  const operator = await prisma.user.create({
     data: {
-      email: "user@togather.demo",
-      passwordHash,
-      profile: {
-        create: {
-          name: "Budi Santoso",
-          phone: "+6281234567891",
-          phoneVerifiedAt: new Date(),
-          domicile: "SLEMAN",
-          interests: [
-            InterestCategory.OLAHRAGA,
-            InterestCategory.SENI_DAN_HIBURAN,
-          ],
-          bio: "Suka lari pagi dan nonton konser musik lokal.",
-        },
-      },
-    },
-  });
-
-  const incompleteUser = await prisma.user.create({
-    data: {
-      email: "incomplete@togather.demo",
-      passwordHash,
-      profile: {
-        create: {
-          name: "Ani Wijaya",
-          phone: "+6281234567892",
-          // No phoneVerifiedAt - incomplete
-          domicile: Area.BANTUL,
-          interests: [],
-          bio: null,
-        },
-      },
-    },
-  });
-
-  const organizerUser = await prisma.user.create({
-    data: {
-      email: "organizer@togather.demo",
+      email: "operator@togather.demo",
       passwordHash,
       profile: {
         create: {
           name: "Dedi Prasetyo",
           phone: "+6281234567893",
           phoneVerifiedAt: new Date(),
-          domicile: "KOTA_YOGYAKARTA",
+          domicile: Area.SLEMAN,
+          address: "Jl. Kaliurang KM 5, Sleman",
           interests: [
             InterestCategory.TEKNOLOGI,
             InterestCategory.BISNIS_DAN_KARIER,
@@ -114,14 +86,29 @@ async function main() {
     },
   });
 
-  console.log(`✅ Created demo accounts (password: ${SEED_PASSWORD})`);
+  // Plain user: profile intentionally left incomplete (no phone verification,
+  // no domicile, no address) so the INCOMPLETE -> VERIFIED flow can be tested.
+  const user = await prisma.user.create({
+    data: {
+      email: "user@togather.demo",
+      passwordHash,
+      profile: {
+        create: {
+          name: "Budi Santoso",
+        },
+      },
+    },
+  });
 
-  // Create DEMO communities covering all areas and scenarios
-  const demoCommunities = await createDemoCommunities(
-    admin.id,
-    verifiedUser.id,
-    organizerUser.id
-  );
+  console.log("✅ Created 3 accounts");
+  console.log(`   Admin:    ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+  console.log(`   Operator: operator@togather.demo / ${SEED_PASSWORD}`);
+  console.log(`   User:     user@togather.demo / ${SEED_PASSWORD}`);
+
+  // Create DEMO communities covering all areas and scenarios.
+  // Only the completed-profile accounts (admin, operator) own communities:
+  // an incomplete user may not submit communities yet.
+  const demoCommunities = await createDemoCommunities(admin.id, operator.id);
 
   console.log(`✅ Created ${demoCommunities.length} DEMO communities`);
 
@@ -136,18 +123,9 @@ async function main() {
   console.log(`✅ Created ${demoEvents.length} DEMO events`);
 
   console.log("🎉 Seed completed successfully!");
-  console.log("\n📋 Demo Accounts:");
-  console.log(`   Admin:      admin@togather.demo / ${SEED_PASSWORD}`);
-  console.log(`   Verified:   user@togather.demo / ${SEED_PASSWORD}`);
-  console.log(`   Incomplete: incomplete@togather.demo / ${SEED_PASSWORD}`);
-  console.log(`   Organizer:  organizer@togather.demo / ${SEED_PASSWORD}`);
 }
 
-async function createDemoCommunities(
-  adminId: string,
-  verifiedUserId: string,
-  organizerUserId: string
-) {
+async function createDemoCommunities(adminId: string, operatorId: string) {
   const communities: any[] = [];
 
   // PRD 12.2 Scenario communities
@@ -164,7 +142,7 @@ async function createDemoCommunities(
       addressText: "Alun-Alun Kidul, Kota Yogyakarta",
       coordinates: { lat: -7.8127, lng: 110.3645 },
       submissionStatus: "APPROVED" as const,
-      organizerId: organizerUserId,
+      organizerId: operatorId,
     },
     // 2. Offline private with location
     {
@@ -178,7 +156,7 @@ async function createDemoCommunities(
       addressText: "Berbagai lokasi di Sleman",
       coordinates: AREA_CENTROIDS.SLEMAN,
       submissionStatus: "APPROVED" as const,
-      organizerId: organizerUserId,
+      organizerId: operatorId,
     },
     // 3. Online public tanpa lokasi fisik
     {
@@ -192,7 +170,7 @@ async function createDemoCommunities(
       addressText: null,
       coordinates: null,
       submissionStatus: "APPROVED" as const,
-      organizerId: organizerUserId,
+      organizerId: operatorId,
     },
     // 4. Online private
     {
@@ -206,7 +184,7 @@ async function createDemoCommunities(
       addressText: null,
       coordinates: null,
       submissionStatus: "APPROVED" as const,
-      organizerId: verifiedUserId,
+      organizerId: operatorId,
     },
     // 5. Pending submission
     {
@@ -220,7 +198,7 @@ async function createDemoCommunities(
       addressText: "Wilayah Bantul",
       coordinates: AREA_CENTROIDS.BANTUL,
       submissionStatus: "PENDING" as const,
-      organizerId: verifiedUserId,
+      organizerId: operatorId,
     },
     // 6. Approved submission (already above)
     // 7. Rejected submission
@@ -234,7 +212,7 @@ async function createDemoCommunities(
       addressText: null,
       coordinates: null,
       submissionStatus: "REJECTED" as const,
-      organizerId: verifiedUserId,
+      organizerId: operatorId,
       rejectionReason: "Community purpose unclear and appears to be spam.",
     },
   ];
@@ -251,7 +229,7 @@ async function createDemoCommunities(
       area: Area.KULON_PROGO,
       coordinates: AREA_CENTROIDS.KULON_PROGO,
       submissionStatus: "APPROVED" as const,
-      organizerId: organizerUserId,
+      organizerId: operatorId,
     },
     {
       name: "Gunungkidul Batik Heritage",
@@ -266,7 +244,7 @@ async function createDemoCommunities(
       area: Area.GUNUNGKIDUL,
       coordinates: AREA_CENTROIDS.GUNUNGKIDUL,
       submissionStatus: "APPROVED" as const,
-      organizerId: verifiedUserId,
+      organizerId: operatorId,
     },
     {
       name: "Jogja Startup Founders",
@@ -281,7 +259,7 @@ async function createDemoCommunities(
       area: Area.KOTA_YOGYAKARTA,
       coordinates: AREA_CENTROIDS.KOTA_YOGYAKARTA,
       submissionStatus: "APPROVED" as const,
-      organizerId: organizerUserId,
+      organizerId: operatorId,
     },
     {
       name: "DIY Book Club Online",
@@ -293,7 +271,7 @@ async function createDemoCommunities(
       area: null,
       coordinates: null,
       submissionStatus: "APPROVED" as const,
-      organizerId: verifiedUserId,
+      organizerId: operatorId,
     },
     {
       name: "Sleman Youth Islamic Study",
@@ -305,11 +283,11 @@ async function createDemoCommunities(
       area: Area.SLEMAN,
       coordinates: AREA_CENTROIDS.SLEMAN,
       submissionStatus: "APPROVED" as const,
-      organizerId: organizerUserId,
+      organizerId: operatorId,
     },
   ];
 
-  const allCommunityData = [...scenarios, ...additionalCommunities];
+  const allCommunityData: any[] = [...scenarios, ...additionalCommunities];
 
   for (const data of allCommunityData) {
     const community = await prisma.community.create({
@@ -497,7 +475,7 @@ async function createDemoEvents(adminId: string, communities: any[]) {
     },
   ];
 
-  const allEventData = [...upcomingEvents, ...pastEvents];
+  const allEventData: any[] = [...upcomingEvents, ...pastEvents];
 
   for (const data of allEventData) {
     const event = await prisma.event.create({

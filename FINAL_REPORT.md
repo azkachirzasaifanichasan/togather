@@ -108,11 +108,12 @@ npm run dev
 Visit http://localhost:3000 (or 3001 if port 3000 in use)
 
 ### Demo Accounts
-All use password: **`demo123456`**
-- `admin@togather.demo` - Full admin access
-- `user@togather.demo` - Verified user
-- `incomplete@togather.demo` - Incomplete profile (blocked from submission)
-- `organizer@togather.demo` - Community organizer
+- `Togather@gmail.com` / `Togather30` - Admin Togather (full access)
+- `operator@togather.demo` / `demo123456` - Operator (profile complete)
+- `user@togather.demo` / `demo123456` - User with incomplete profile (complete it at `/profile`)
+
+Only two roles exist: Admin and User. "Operator" is a user whose profile is complete
+(verified phone + domicile + address).
 
 ### Docker Deployment
 ```bash

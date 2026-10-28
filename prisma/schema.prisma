@@ -75,6 +75,8 @@ model UserProfile {
   phone           String?
   phoneVerifiedAt DateTime?
   domicile        Area?
+  address         String?
+  avatarUrl       String?
   interests       InterestCategory[]
   bio             String?
 

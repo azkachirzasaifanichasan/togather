@@ -11,6 +11,7 @@ import { Logo } from "@/components/Sidebar/Logo";
 import { SearchBar } from "@/components/Sidebar/SearchBar";
 import { LocationDisplay } from "@/components/Sidebar/LocationDisplay";
 import { FilterBar } from "@/components/Sidebar/FilterBar";
+import { AccountMenu } from "@/components/AccountMenu";
 import Link from "next/link";
 
 export default function DiscoveryPage() {
@@ -21,6 +22,18 @@ export default function DiscoveryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<InterestCategory[]>([]);
   const [selectedAreas, setSelectedAreas] = useState<Area[]>([]);
+
+  // undefined = still loading, null = signed out.
+  const [me, setMe] = useState<
+    { name: string; avatarUrl: string | null } | null | undefined
+  >(undefined);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((res) => res.json())
+      .then((data) => setMe(data.user ?? null))
+      .catch(() => setMe(null));
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -95,15 +108,28 @@ export default function DiscoveryPage() {
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-6">
             {/* User Profile Card - Authenticated State */}
-            <Link href="/profile" className="block bg-gray-50 rounded-xl p-4 hover:bg-gray-100 cursor-pointer transition-colors">
+            <Link href={me ? "/profile" : "/login"} className="block bg-gray-50 rounded-xl p-4 hover:bg-gray-100 cursor-pointer transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#7960D7] rounded-full flex items-center justify-center text-white font-bold">
-                    U
-                  </div>
+                  {me?.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={me.avatarUrl}
+                      alt={me.name}
+                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-[#7960D7] rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                      {me ? me.name.charAt(0).toUpperCase() : "?"}
+                    </div>
+                  )}
                   <div className="flex flex-col">
-                    <span className="font-medium text-[#1F2937]">User</span>
-                    <span className="text-xs text-[#6B7280]">View profile</span>
+                    <span className="font-medium text-[#1F2937] truncate">
+                      {me === undefined ? "" : me ? me.name : "Masuk / Daftar"}
+                    </span>
+                    {me !== null && (
+                      <span className="text-xs text-[#6B7280]">View profile</span>
+                    )}
                   </div>
                 </div>
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,11 +258,7 @@ export default function DiscoveryPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
                 </button>
-                <Link href="/profile">
-                  <div className="w-8 h-8 bg-[#7960D7] rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:bg-[#6950c7] transition-colors">
-                    U
-                  </div>
-                </Link>
+                <AccountMenu />
               </div>
             </div>
           </div>

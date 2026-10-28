@@ -21,10 +21,31 @@ export const updateProfileSchema = z.object({
   name: z.string().min(1, "Nama wajib diisi").max(100),
   phone: z.string().regex(/^(\+62|0)[0-9]{9,12}$/, "Nomor HP tidak valid"),
   domicile: z.nativeEnum(Area, { required_error: "Domisili wajib diisi" }),
+  address: z.string().min(5, "Alamat minimal 5 karakter").max(300),
   interests: z
     .array(z.nativeEnum(InterestCategory))
     .min(1, "Pilih minimal 1 minat"),
   bio: z.string().min(10, "Bio minimal 10 karakter").max(500),
+});
+
+// Profile completion gate: a user only needs verified phone + domicile + address
+// to become an organizer. Name/phone/interests/bio are collected but not required.
+export const completeProfileSchema = z.object({
+  name: z.string().min(1, "Nama wajib diisi").max(100),
+  phone: z.string().regex(/^(\+62|0)[0-9]{9,12}$/, "Nomor HP tidak valid"),
+  domicile: z.nativeEnum(Area, { required_error: "Domisili wajib diisi" }),
+  address: z.string().min(5, "Alamat minimal 5 karakter").max(300),
+  // Empty string = keep the current photo. The uploader sends a downscaled
+  // data URL so no file storage is needed yet.
+  avatarUrl: z
+    .string()
+    .max(300_000, "Foto terlalu besar")
+    .refine((v) => v === "" || v.startsWith("data:image/"), "Foto tidak valid")
+    .optional(),
+  // Shown on the profile page ("My interests" / "About"). Optional so the
+  // organizer gate still passes without them.
+  interests: z.array(z.nativeEnum(InterestCategory)).optional(),
+  bio: z.string().max(500, "Bio maksimal 500 karakter").optional(),
 });
 
 export const activatePhoneSchema = z.object({
@@ -124,6 +145,7 @@ export const reviewJoinRequestSchema = z.object({
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type CompleteProfileInput = z.infer<typeof completeProfileSchema>;
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
