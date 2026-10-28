@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getUserEventRegistrations } from '@/server/events';
 import Link from 'next/link';
 import { AccountMenu } from '@/components/AccountMenu';
 import Image from 'next/image';
@@ -14,46 +14,13 @@ export default async function EventPage({
   const activeTab = tab || 'going';
 
   // Get user's event registrations (only if logged in)
-  const userRegistrations = session
-    ? await prisma.eventRegistration.findMany({
-        where: {
-          userId: session.user.id,
-          cancelledAt: null, // Only non-cancelled
-        },
-        include: {
-          event: {
-            include: {
-              relatedCommunities: {
-                include: {
-                  community: true
-                }
-              },
-            },
-          },
-        },
-      })
+  // The service already filters by tab: TERDAFTAR = upcoming/ongoing, RIWAYAT = past.
+  const currentEvents = session
+    ? (await getUserEventRegistrations(
+        session.user.id,
+        activeTab === 'past' ? 'RIWAYAT' : 'TERDAFTAR'
+      )).map((reg) => reg.event)
     : [];
-
-  // Filter events based on tab
-  const now = new Date();
-  const goingEvents = userRegistrations
-    .filter(reg => new Date(reg.event.startDate) >= now)
-    .map(reg => ({
-      ...reg.event,
-      community: reg.event.relatedCommunities[0]?.community
-    }));
-
-  // For "saved" we'll use same as going for now (can add wishlist later)
-  const savedEvents = goingEvents;
-
-  const pastEvents = userRegistrations
-    .filter(reg => new Date(reg.event.startDate) < now)
-    .map(reg => ({
-      ...reg.event,
-      community: reg.event.relatedCommunities[0]?.community
-    }));
-
-  const currentEvents = activeTab === 'going' ? goingEvents : activeTab === 'saved' ? savedEvents : pastEvents;
 
   return (
     <div className="min-h-screen bg-white">
@@ -227,7 +194,7 @@ export default async function EventPage({
             </div>
 
             <h2 className="text-2xl font-bold text-gray-900 mb-3">
-              No plans yet? Let's fix that
+              No plans yet? Let&apos;s fix that
             </h2>
             <p className="text-gray-600 mb-8 max-w-md mx-auto">
               Explore fresh events and find something exciting to join.
@@ -279,12 +246,12 @@ export default async function EventPage({
                           </svg>
                           <span>{event.venue || 'TBA'}</span>
                         </div>
-                        {event.community && (
+                        {event.relatedCommunities[0] && (
                           <div className="flex items-center gap-1">
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                             </svg>
-                            <span>{event.community.name}</span>
+                            <span>{event.relatedCommunities[0].name}</span>
                           </div>
                         )}
                       </div>
@@ -324,7 +291,7 @@ export default async function EventPage({
                 <span className="text-xl font-bold">Togather</span>
               </div>
               <p className="text-gray-400 text-sm">
-                The people platform — where communities meet and events come alive.
+                The people platform â€” where communities meet and events come alive.
               </p>
             </div>
 
@@ -357,7 +324,7 @@ export default async function EventPage({
           </div>
 
           <div className="border-t border-gray-800 mt-8 pt-8 flex items-center justify-between text-sm text-gray-400">
-            <p>© 2026 Togather. All rights reserved.</p>
+            <p>Â© 2026 Togather. All rights reserved.</p>
             <div className="flex items-center gap-6">
               <a href="#" className="hover:text-white">Terms of service</a>
               <a href="#" className="hover:text-white">Privacy policy</a>

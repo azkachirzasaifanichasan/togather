@@ -5,9 +5,10 @@ const prisma = new PrismaClient();
 
 const SEED_PASSWORD = process.env.SEED_DEMO_PASSWORD || "demo123456";
 
-// Fixed credentials for the admin account (per product requirement)
+// Fixed credentials for the admin account (per product requirement).
+// The password comes from the environment so it is not published with the repo.
 const ADMIN_EMAIL = "Togather@gmail.com";
-const ADMIN_PASSWORD = "Togather30";
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || "Togather30";
 
 type SeedCommunity = {
   name: string;
@@ -53,7 +54,7 @@ const AREA_CENTROIDS: Record<Area, { lat: number; lng: number }> = {
 };
 
 async function main() {
-  console.log("🌱 Starting seed...");
+  console.log("ðŸŒ± Starting seed...");
 
   // Clear existing data (in reverse FK order)
   await prisma.userActivityHistory.deleteMany();
@@ -71,7 +72,7 @@ async function main() {
   await prisma.userProfile.deleteMany();
   await prisma.user.deleteMany();
 
-  console.log("✅ Cleared existing data");
+  console.log("âœ… Cleared existing data");
 
   // Create the three accounts that map to the three roles.
   // "Operator" is not a stored role: it is a user whose profile is complete
@@ -133,27 +134,42 @@ async function main() {
     },
   });
 
-  console.log("✅ Created 3 accounts");
+  console.log("âœ… Created 3 accounts");
   console.log(`   Admin:    ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
   console.log(`   Operator: operator@togather.demo / ${SEED_PASSWORD}`);
   console.log(`   User:     user@togather.demo / ${SEED_PASSWORD}`);
+
+  // Link the operator to a Google account so the OAuth account-linking path
+  // has demo data. The provider account id stands in for Google's `sub`.
+  await prisma.account.create({
+    data: {
+      userId: operator.id,
+      type: "oauth",
+      provider: "google",
+      providerAccountId: "demo-google-sub-0001",
+      scope: "openid email profile",
+      token_type: "Bearer",
+    },
+  });
+
+  console.log("âœ… Linked 1 demo Google account");
 
   // Create DEMO communities covering all areas and scenarios.
   // Only the completed-profile accounts (admin, operator) own communities:
   // an incomplete user may not submit communities yet.
   const demoCommunities = await createDemoCommunities(admin.id, operator.id);
 
-  console.log(`✅ Created ${demoCommunities.length} DEMO communities`);
+  console.log(`âœ… Created ${demoCommunities.length} DEMO communities`);
 
   // Import reference data from DIY_Events_2026.md
   const importReport = await importReferenceData();
 
-  console.log(`✅ Import complete: ${JSON.stringify(importReport)}`);
+  console.log(`âœ… Import complete: ${JSON.stringify(importReport)}`);
 
   // Create DEMO events
   const demoEvents = await createDemoEvents(admin.id, demoCommunities);
 
-  console.log(`✅ Created ${demoEvents.length} DEMO events`);
+  console.log(`âœ… Created ${demoEvents.length} DEMO events`);
 
   // Create DEMO activity so every flow can be demonstrated:
   // - a full event (quota reached)
@@ -169,12 +185,12 @@ async function main() {
   });
 
   console.log(
-    `✅ Created demo activity: ${activity.activeRegistrations} active registration(s), ` +
+    `âœ… Created demo activity: ${activity.activeRegistrations} active registration(s), ` +
       `${activity.pastRegistrations} past registration(s), ${activity.attendance} attendance, ` +
       `${activity.joinRequests} pending join request(s)`
   );
 
-  console.log("🎉 Seed completed successfully!");
+  console.log("ðŸŽ‰ Seed completed successfully!");
 }
 
 async function createDemoCommunities(adminId: string, operatorId: string) {
@@ -316,7 +332,7 @@ async function createDemoCommunities(adminId: string, operatorId: string) {
     {
       name: "DIY Book Club Online",
       description:
-        "Klub buku online untuk pencinta literatur di DIY. Diskusi mingguan via Zoom.",
+        "Klub buku online untuk pencinta literatur di DIY. Diskusi mingguan via Zoom,diskusi bulanan di bookstore Searook.",
       type: "ONLINE" as const,
       accessType: "PUBLIC" as const,
       categories: [InterestCategory.PENDIDIKAN, InterestCategory.HOBI],
@@ -339,7 +355,10 @@ async function createDemoCommunities(adminId: string, operatorId: string) {
     },
   ];
 
-  const allCommunityData: any[] = [...scenarios, ...additionalCommunities];
+  const allCommunityData: SeedCommunity[] = [
+    ...scenarios,
+    ...additionalCommunities,
+  ];
 
   for (const data of allCommunityData) {
     const community = await prisma.community.create({
@@ -531,7 +550,7 @@ async function createDemoEvents(
     },
   ];
 
-  const allEventData: any[] = [...upcomingEvents, ...pastEvents];
+  const allEventData: SeedEvent[] = [...upcomingEvents, ...pastEvents];
 
   for (const data of allEventData) {
     const event = await prisma.event.create({
@@ -690,7 +709,7 @@ main()
     await prisma.$disconnect();
   })
   .catch(async (e) => {
-    console.error("❌ Seed failed:", e);
+    console.error("âŒ Seed failed:", e);
     await prisma.$disconnect();
     process.exit(1);
   });

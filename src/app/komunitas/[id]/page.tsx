@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+import { getCommunityProfileById, getUserCommunities } from '@/server/communities';
 import Link from 'next/link';
 import { AccountMenu } from '@/components/AccountMenu';
 import Image from 'next/image';
@@ -19,65 +19,19 @@ export default async function CommunityProfilePage({
 
   const { id } = await params;
 
-  const community = await prisma.community.findUnique({
-    where: { id },
-    include: {
-      members: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              profile: {
-                select: {
-                  name: true
-                }
-              }
-            }
-          },
-        },
-      },
-      organizers: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              profile: {
-                select: {
-                  name: true
-                }
-              }
-            }
-          }
-        }
-      },
-      events: {
-        include: {
-          event: true
-        }
-      },
-    },
-  });
+  const community = await getCommunityProfileById(id, session.user.id);
 
   if (!community) {
     notFound();
   }
 
-  // Extract upcoming events from EventCommunity relation
-  const now = new Date();
-  const upcomingEvents = community.events
-    .map(ec => ec.event)
-    .filter(event => event.isPublished && new Date(event.startDate) >= now)
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  const { upcomingEvents } = community;
 
   // Get admin from first organizer
-  const admin = community.organizers[0]?.user;
+  const admin = community.hosts[0];
 
   // Check membership only if logged in
-  const isMember = session
-    ? community.members.some(m => m.userId === session.user.id)
-    : false;
+  const isMember = community.isMember;
 
   // Membership changes need the resolved community id, so they are defined here.
   async function toggleMembership() {
@@ -99,19 +53,7 @@ export default async function CommunityProfilePage({
   }
 
   // Get user's communities for sidebar
-  const userCommunities = await prisma.communityMembership.findMany({
-    where: { userId: session.user.id },
-    include: {
-      community: {
-        include: {
-          _count: {
-            select: { members: true }
-          }
-        }
-      }
-    },
-    take: 4
-  });
+  const userCommunities = (await getUserCommunities(session.user.id)).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-white">
@@ -192,11 +134,11 @@ export default async function CommunityProfilePage({
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Your community</h3>
               <div className="space-y-2">
                 {userCommunities.map((membership) => {
-                  const isActive = membership.community.id === community.id;
+                  const isActive = membership.id === community.id;
                   return (
                     <Link
-                      key={membership.community.id}
-                      href={`/komunitas/${membership.community.id}`}
+                      key={membership.id}
+                      href={`/komunitas/${membership.id}`}
                       className={`flex items-center gap-3 p-2 rounded-lg group ${
                         isActive ? 'bg-[#7960D7] bg-opacity-10' : 'hover:bg-gray-100'
                       }`}
@@ -207,17 +149,17 @@ export default async function CommunityProfilePage({
                         <span className={`font-semibold ${
                           isActive ? 'text-white' : 'text-gray-700'
                         }`}>
-                          {membership.community.name.charAt(0)}
+                          {membership.name.charAt(0)}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-semibold truncate ${
                           isActive ? 'text-[#7960D7]' : 'text-gray-900'
                         }`}>
-                          {membership.community.name}
+                          {membership.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {membership.community._count.members} members
+                          {membership.memberCount} members
                         </p>
                       </div>
                       {isActive && (
@@ -285,7 +227,7 @@ export default async function CommunityProfilePage({
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-12">
             <div className="bg-[#7960D7] text-white rounded-2xl p-6">
-              <p className="text-5xl font-bold mb-2">{community.members.length}</p>
+              <p className="text-5xl font-bold mb-2">{community.memberCount}</p>
               <p className="text-purple-100 text-sm">members</p>
             </div>
             <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
@@ -327,7 +269,7 @@ export default async function CommunityProfilePage({
                         {event.name}
                       </h4>
                       <p className="text-sm text-gray-600 mt-1">
-                        {event.startTime || 'TBA'} • {event.venue || 'TBA'}
+                        {event.startTime || 'TBA'} â€¢ {event.venue || 'TBA'}
                       </p>
                     </div>
                     <button className="w-10 h-10 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 flex-shrink-0">
@@ -351,13 +293,13 @@ export default async function CommunityProfilePage({
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-lg">
-                    {admin?.profile?.name?.charAt(0).toUpperCase() || 'A'}
+                    {admin?.name?.charAt(0).toUpperCase() || 'A'}
                   </span>
                 </div>
                 <div>
-                  <p className="font-bold text-gray-900">{admin?.profile?.name || 'Anonymous'}</p>
+                  <p className="font-bold text-gray-900">{admin?.name || 'Anonymous'}</p>
                   <p className="text-sm text-gray-600">
-                    Community host • {upcomingEvents.length} events hosted
+                    Community host â€¢ {upcomingEvents.length} events hosted
                   </p>
                 </div>
               </div>

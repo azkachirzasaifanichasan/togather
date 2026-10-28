@@ -163,6 +163,54 @@ export const eventDiscoveryQuerySchema = z.object({
   distance: z.number().positive().max(100).optional(),
 });
 
+/**
+ * Query parameter names that the discovery endpoints understand.
+ * Anything else is not a filter.
+ */
+const KNOWN_FILTER_PARAMS = new Set([
+  "search",
+  "categories",
+  "area",
+  "type",
+  "accessType",
+  "status",
+  "bounds",
+  "sw_lat",
+  "sw_lng",
+  "ne_lat",
+  "ne_lng",
+  "lat",
+  "lng",
+  "distance",
+  "startDate",
+]);
+
+/**
+ * Read the search term from a discovery query string.
+ *
+ * `?search=searook` is the canonical form. A bare `?searook` (a valueless
+ * unknown parameter) is also accepted as the search term, so the demo URL in
+ * the API contract works as written. A valueless *known* filter (`?area=`) is
+ * ignored, and an unknown parameter that carries a value (`?utm_source=x`) is
+ * ignored too — only a bare `?term` is treated as a search.
+ */
+export function readSearchTerm(
+  searchParams: URLSearchParams
+): string | undefined {
+  const explicit = searchParams.get("search")?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  for (const [key, value] of searchParams.entries()) {
+    if (value === "" && !KNOWN_FILTER_PARAMS.has(key)) {
+      return key;
+    }
+  }
+
+  return undefined;
+}
+
 // Registration
 export const registerEventSchema = z.object({
   eventId: z.string().cuid(),

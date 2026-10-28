@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getDiscoveryCommunities, getUserCommunities } from '@/server/communities';
 import Link from 'next/link';
 import { AccountMenu } from '@/components/AccountMenu';
 import Image from 'next/image';
@@ -9,33 +9,11 @@ export default async function KomunitasPage() {
 
   // Get user's communities (only if logged in)
   const userCommunities = session
-    ? await prisma.communityMembership.findMany({
-        where: { userId: session.user.id },
-        include: {
-          community: {
-            include: {
-              _count: {
-                select: { members: true }
-              }
-            }
-          }
-        }
-      })
+    ? await getUserCommunities(session.user.id)
     : [];
 
   // Get all communities for discovery (public)
-  const allCommunities = await prisma.community.findMany({
-    include: {
-      _count: {
-        select: { members: true }
-      }
-    },
-    orderBy: {
-      members: {
-        _count: 'desc'
-      }
-    }
-  });
+  const allCommunities = await getDiscoveryCommunities();
 
   return (
     <div className="min-h-screen bg-white">
@@ -120,21 +98,21 @@ export default async function KomunitasPage() {
               <div className="space-y-2">
                 {userCommunities.map((membership) => (
                   <Link
-                    key={membership.community.id}
-                    href={`/komunitas/${membership.community.id}`}
+                    key={membership.id}
+                    href={`/komunitas/${membership.id}`}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 group"
                   >
                     <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-gray-700 font-semibold">
-                        {membership.community.name.charAt(0)}
+                        {membership.name.charAt(0)}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate">
-                        {membership.community.name}
+                        {membership.name}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {membership.community._count.members} members
+                        {membership.memberCount} members
                       </p>
                     </div>
                     <svg className="w-5 h-5 text-[#7960D7] opacity-0 group-hover:opacity-100 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -166,7 +144,7 @@ export default async function KomunitasPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {allCommunities.map((community) => {
               const isMember = userCommunities.some(
-                (m) => m.community.id === community.id
+                (m) => m.id === community.id
               );
 
               return (
@@ -202,7 +180,7 @@ export default async function KomunitasPage() {
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                           </svg>
-                          <span>{community._count.members} members</span>
+                          <span>{community.memberCount} members</span>
                         </div>
                         {isMember && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#7960D7] bg-opacity-10 text-[#7960D7] text-xs font-semibold rounded-full">

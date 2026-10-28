@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDiscoveryEvents } from "@/server/events";
 import {
   eventDiscoveryQuerySchema,
+  readSearchTerm,
   type EventDiscoveryQuery,
 } from "@/lib/validations";
 import { z } from "zod";
@@ -20,7 +21,7 @@ function parseQuery(searchParams: URLSearchParams): EventDiscoveryQuery {
 
   const area = searchParams.get("area")?.trim();
   const status = searchParams.get("status")?.trim();
-  const search = searchParams.get("search")?.trim();
+  const search = readSearchTerm(searchParams);
   const startDate = searchParams.get("startDate")?.trim();
 
   const latRaw = searchParams.get("lat")?.trim();

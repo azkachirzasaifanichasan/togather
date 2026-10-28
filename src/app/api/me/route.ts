@@ -22,7 +22,9 @@ export async function GET() {
 
     // Fresh account data for the header dropdown.
     if (!session?.user?.id) {
-      return NextResponse.json({ user: null }, { status: 401 });
+      // Use the shared error envelope: every non-2xx response in this API
+      // returns `{ error: { code, message } }` (docs/API_CONTRACT.md §2).
+      throw new Error("UNAUTHORIZED");
     }
 
     const [ctx, profile] = await Promise.all([
@@ -30,14 +32,7 @@ export async function GET() {
       prisma.userProfile.findUnique({ where: { userId: session.user.id } }),
     ]);
 
-    const isComplete = Boolean(
-      profile &&
-        profile.name &&
-        profile.phone &&
-        profile.domicile &&
-        profile.interests.length > 0 &&
-        profile.bio
-    );
+    const isComplete = ctx.status === "VERIFIED";
 
     return NextResponse.json({
       // Shape used by AccountMenu / discovery sidebar.
@@ -58,6 +53,8 @@ export async function GET() {
             phone: profile.phone,
             phoneVerifiedAt: profile.phoneVerifiedAt,
             domicile: profile.domicile,
+            address: profile.address,
+            avatarUrl: profile.avatarUrl,
             interests: profile.interests,
             bio: profile.bio,
           }
