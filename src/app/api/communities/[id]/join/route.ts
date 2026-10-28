@@ -1,117 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { joinCommunity, leaveCommunity } from "@/server/membership";
+import { errorResponse } from "@/lib/api-error";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Check authentication
     const session = await auth();
-    const { id } = await params;
-
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      throw new Error("UNAUTHORIZED");
     }
 
-    const communityId = id;
+    const { id: communityId } = await params;
+    const result = await joinCommunity(session.user.id, communityId);
 
-    // Check if community exists and is approved
-    const community = await prisma.community.findUnique({
-      where: { id: communityId },
-      include: {
-        submission: true,
-      }
+    return NextResponse.json({
+      success: true,
+      status: result.status,
+      ...(result.status === "request_exists" && {
+        requestStatus: result.requestStatus,
+      }),
     });
-
-    if (!community) {
-      return NextResponse.json(
-        { error: "Community not found" },
-        { status: 404 }
-      );
-    }
-
-    // Only allow joining approved communities
-    if (community.submission?.status !== "APPROVED") {
-      return NextResponse.json(
-        { error: "Community is not approved yet" },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is already a member
-    const existingMembership = await prisma.communityMembership.findUnique({
-      where: {
-        communityId_userId: {
-          communityId,
-          userId: session.user.id,
-        }
-      }
-    });
-
-    if (existingMembership) {
-      return NextResponse.json(
-        { error: "Already a member of this community" },
-        { status: 400 }
-      );
-    }
-
-    // Handle based on access type
-    if (community.accessType === "PUBLIC") {
-      // Public communities - immediate join
-      const membership = await prisma.communityMembership.create({
-        data: {
-          communityId,
-          userId: session.user.id,
-        }
-      });
-
-      return NextResponse.json({
-        success: true,
-        membership,
-        message: "Successfully joined the community"
-      });
-    } else {
-      // Private communities - create join request
-      const existingRequest = await prisma.communityJoinRequest.findUnique({
-        where: {
-          communityId_userId: {
-            communityId,
-            userId: session.user.id,
-          }
-        }
-      });
-
-      if (existingRequest) {
-        return NextResponse.json(
-          { error: "Join request already pending" },
-          { status: 400 }
-        );
-      }
-
-      const joinRequest = await prisma.communityJoinRequest.create({
-        data: {
-          communityId,
-          userId: session.user.id,
-          status: "PENDING",
-        }
-      });
-
-      return NextResponse.json({
-        success: true,
-        joinRequest,
-        message: "Join request submitted, awaiting approval"
-      });
-    }
   } catch (error) {
-    console.error("Error joining community:", error);
-    return NextResponse.json(
-      { error: "Failed to join community" },
-      { status: 500 }
-    );
+    return errorResponse(error);
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("UNAUTHORIZED");
+    }
+
+    const { id: communityId } = await params;
+    const result = await leaveCommunity(session.user.id, communityId);
+
+    return NextResponse.json({
+      success: true,
+      status: result.status,
+    });
+  } catch (error) {
+    return errorResponse(error);
   }
 }

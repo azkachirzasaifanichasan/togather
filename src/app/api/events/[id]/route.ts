@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getEventById } from "@/server/events";
+import { getPublicEventById } from "@/server/events";
 import { auth } from "@/lib/auth";
 
 export async function GET(
@@ -11,17 +11,30 @@ export async function GET(
     const session = await auth();
     const userId = session?.user?.id;
 
-    const event = await getEventById(id, userId);
+    const event = await getPublicEventById(id, userId);
 
     if (!event) {
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: {
+            code: "NOT_FOUND",
+            message: "Event not found",
+          },
+        },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json(event);
   } catch (error) {
     console.error("Error fetching event:", error);
     return NextResponse.json(
-      { error: "Failed to fetch event" },
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to fetch event",
+        },
+      },
       { status: 500 }
     );
   }

@@ -6,10 +6,11 @@ import Image from 'next/image';
 export default async function EventPage({
   searchParams,
 }: {
-  searchParams: { tab?: string };
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const session = await auth();
-  const activeTab = searchParams.tab || 'going';
+  const { tab } = await searchParams;
+  const activeTab = tab || 'going';
 
   // Get user's event registrations (only if logged in)
   const userRegistrations = session

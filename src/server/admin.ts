@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 /**
  * Get pending community submissions for admin approval.
@@ -48,8 +49,12 @@ export async function approveCommunitySubmission(
     },
   });
 
-  if (!submission || submission.status !== "PENDING") {
-    throw new Error("Submission not found or already reviewed");
+  if (!submission) {
+    throw new Error("NOT_FOUND");
+  }
+
+  if (submission.status !== "PENDING") {
+    throw new Error("CONFLICT");
   }
 
   return await prisma.$transaction(async (tx) => {
@@ -63,23 +68,37 @@ export async function approveCommunitySubmission(
       },
     });
 
-    // Make submitter the first organizer
-    await tx.communityOrganizer.create({
-      data: {
+    // Make submitter the first organizer (idempotent — the row may already exist)
+    await tx.communityOrganizer.upsert({
+      where: {
+        communityId_userId: {
+          communityId: submission.communityId,
+          userId: submission.userId,
+        },
+      },
+      create: {
         communityId: submission.communityId,
         userId: submission.userId,
       },
+      update: {},
     });
 
-    // Also add submitter as first member
-    await tx.communityMembership.create({
-      data: {
+    // Also add submitter as first member (idempotent)
+    await tx.communityMembership.upsert({
+      where: {
+        communityId_userId: {
+          communityId: submission.communityId,
+          userId: submission.userId,
+        },
+      },
+      create: {
         communityId: submission.communityId,
         userId: submission.userId,
       },
+      update: {},
     });
 
-    return { status: "approved" as const };
+    return { status: "approved" as const, communityId: submission.communityId };
   });
 }
 
@@ -95,8 +114,12 @@ export async function rejectCommunitySubmission(
     where: { id: submissionId },
   });
 
-  if (!submission || submission.status !== "PENDING") {
-    throw new Error("Submission not found or already reviewed");
+  if (!submission) {
+    throw new Error("NOT_FOUND");
+  }
+
+  if (submission.status !== "PENDING") {
+    throw new Error("CONFLICT");
   }
 
   await prisma.communitySubmission.update({
@@ -128,6 +151,28 @@ export async function getAllEventsForAdmin() {
           },
         },
       },
+      registrations: {
+        where: {
+          cancelledAt: null,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              profile: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          attendance: true,
+        },
+        orderBy: {
+          registeredAt: "asc",
+        },
+      },
       _count: {
         select: {
           registrations: {
@@ -157,7 +202,7 @@ export async function markAttendance(
   });
 
   if (!registration) {
-    throw new Error("Registration not found");
+    throw new Error("NOT_FOUND");
   }
 
   // Upsert attendance record
@@ -165,6 +210,7 @@ export async function markAttendance(
     where: { registrationId },
     create: {
       registrationId,
+      eventId: registration.eventId,
       attended,
       markedAt: new Date(),
       markedBy,
@@ -185,7 +231,7 @@ export async function recordActivity(
   action: string,
   targetType?: string,
   targetId?: string,
-  metadata?: any
+  metadata?: Prisma.InputJsonValue
 ) {
   await prisma.userActivityHistory.create({
     data: {

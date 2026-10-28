@@ -1,11 +1,43 @@
 import { PrismaClient, InterestCategory, Area } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { readFileSync } from "fs";
-import { join } from "path";
 
 const prisma = new PrismaClient();
 
 const SEED_PASSWORD = process.env.SEED_DEMO_PASSWORD || "demo123456";
+
+type SeedCommunity = {
+  name: string;
+  description: string;
+  type: "ONLINE" | "OFFLINE";
+  accessType: "PUBLIC" | "PRIVATE";
+  categories: InterestCategory[];
+  area?: Area | null;
+  addressText?: string | null;
+  coordinates?: { lat: number; lng: number } | null;
+  submissionStatus: "APPROVED" | "PENDING" | "REJECTED";
+  organizerId: string;
+  rejectionReason?: string;
+};
+
+type SeedEvent = {
+  name: string;
+  description: string;
+  category: InterestCategory;
+  startDate: Date;
+  endDate?: Date | null;
+  startTime?: string | null;
+  venue?: string | null;
+  area?: Area | null;
+  coordinates?: { lat: number; lng: number } | null;
+  organizer: string;
+  contactInfo?: string | null;
+  quota?: number | null;
+  registrationOpen: boolean;
+  fee?: string | null;
+  externalLink?: string | null;
+  relatedCommunityId?: string | null;
+  dataSource: "DEMO";
+};
 
 // Centroid coordinates for each DIY area (approximate)
 const AREA_CENTROIDS: Record<Area, { lat: number; lng: number }> = {
@@ -31,6 +63,7 @@ async function main() {
   await prisma.communityOrganizer.deleteMany();
   await prisma.communityLocation.deleteMany();
   await prisma.community.deleteMany();
+  await prisma.account.deleteMany();
   await prisma.userProfile.deleteMany();
   await prisma.user.deleteMany();
 
@@ -89,8 +122,7 @@ async function main() {
           domicile: Area.BANTUL,
           interests: [],
           bio: null,
-        },
-      },
+        },      },
     },
   });
 
@@ -116,6 +148,21 @@ async function main() {
 
   console.log(`✅ Created demo accounts (password: ${SEED_PASSWORD})`);
 
+  // Link the verified user to a Google account so the OAuth linking path has
+  // demo data. The provider account id is the Google `sub` value.
+  await prisma.account.create({
+    data: {
+      userId: verifiedUser.id,
+      type: "oauth",
+      provider: "google",
+      providerAccountId: "demo-google-sub-0001",
+      scope: "openid email profile",
+      token_type: "Bearer",
+    },
+  });
+
+  console.log("✅ Linked 1 demo Google account");
+
   // Create DEMO communities covering all areas and scenarios
   const demoCommunities = await createDemoCommunities(
     admin.id,
@@ -126,7 +173,7 @@ async function main() {
   console.log(`✅ Created ${demoCommunities.length} DEMO communities`);
 
   // Import reference data from DIY_Events_2026.md
-  const importReport = await importReferenceData(admin.id);
+  const importReport = await importReferenceData();
 
   console.log(`✅ Import complete: ${JSON.stringify(importReport)}`);
 
@@ -134,6 +181,25 @@ async function main() {
   const demoEvents = await createDemoEvents(admin.id, demoCommunities);
 
   console.log(`✅ Created ${demoEvents.length} DEMO events`);
+
+  // Create DEMO activity so every flow can be demonstrated:
+  // - a full event (quota reached)
+  // - an upcoming registration (TERDAFTAR)
+  // - a past registration + attendance (RIWAYAT)
+  // - a pending join request for the organizer demo
+  const activity = await createDemoActivity({
+    verifiedUserId: verifiedUser.id,
+    incompleteUserId: incompleteUser.id,
+    organizerUserId: organizerUser.id,
+    adminUserId: admin.id,
+    communities: demoCommunities,
+  });
+
+  console.log(
+    `✅ Created demo activity: ${activity.activeRegistrations} active registration(s), ` +
+      `${activity.pastRegistrations} past registration(s), ${activity.attendance} attendance, ` +
+      `${activity.joinRequests} pending join request(s)`
+  );
 
   console.log("🎉 Seed completed successfully!");
   console.log("\n📋 Demo Accounts:");
@@ -148,10 +214,10 @@ async function createDemoCommunities(
   verifiedUserId: string,
   organizerUserId: string
 ) {
-  const communities: any[] = [];
+  const communities: Array<{ id: string; name: string }> = [];
 
   // PRD 12.2 Scenario communities
-  const scenarios = [
+  const scenarios: SeedCommunity[] = [
     // 1. Offline public with location
     {
       name: "Jogja Runners Club",
@@ -240,14 +306,14 @@ async function createDemoCommunities(
   ];
 
   // Add more communities to reach ~60 total, covering all areas
-  const additionalCommunities = [
+  const additionalCommunities: SeedCommunity[] = [
     {
       name: "Kulon Progo Adventure",
       description:
         "Komunitas pecinta alam dan petualangan di Kulon Progo. Hiking, camping, dan eksplorasi goa.",
       type: "OFFLINE" as const,
       accessType: "PUBLIC" as const,
-      categories: [InterestCategory.OLAHRAGA, InterestCategory.HOBI],
+      categories: [InterestCategory.HOBI],
       area: Area.KULON_PROGO,
       coordinates: AREA_CENTROIDS.KULON_PROGO,
       submissionStatus: "APPROVED" as const,
@@ -326,7 +392,7 @@ async function createDemoCommunities(
             userId: data.organizerId,
             status: data.submissionStatus,
             ...(data.submissionStatus === "REJECTED" && {
-              rejectionReason: (data as any).rejectionReason,
+              rejectionReason: data.rejectionReason,
               reviewedAt: new Date(),
               reviewedBy: adminId,
             }),
@@ -352,25 +418,26 @@ async function createDemoCommunities(
     });
 
     // Create location separately
-    if (data.type === "OFFLINE" && data.coordinates) {
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO "CommunityLocation" (id, "communityId", area, coordinates, "addressText", "isOnline")
-        VALUES (
-          gen_random_uuid()::text,
-          '${community.id}',
-          '${data.area}',
-          ST_GeographyFromText('POINT(${data.coordinates.lng} ${data.coordinates.lat})'),
-          ${data.addressText ? `'${data.addressText.replace(/'/g, "''")}'` : "NULL"},
-          false
-        )
-      `);
-    } else {
-      await prisma.communityLocation.create({
-        data: {
-          communityId: community.id,
-          isOnline: true,
-        },
-      });
+    const isOffline = data.type === "OFFLINE";
+
+    await prisma.communityLocation.create({
+      data: {
+        communityId: community.id,
+        area: isOffline ? data.area ?? null : null,
+        addressText: isOffline ? data.addressText ?? null : null,
+        isOnline: !isOffline,
+      },
+    });
+
+    if (isOffline && data.coordinates) {
+      await prisma.$executeRaw`
+        UPDATE "CommunityLocation"
+        SET coordinates = ST_SetSRID(
+          ST_MakePoint(${data.coordinates.lng}, ${data.coordinates.lat}),
+          4326
+        )::geography
+        WHERE "communityId" = ${community.id}
+      `;
     }
 
     communities.push(community);
@@ -379,7 +446,7 @@ async function createDemoCommunities(
   return communities;
 }
 
-async function importReferenceData(adminId: string) {
+async function importReferenceData() {
   // For now, return empty report - full import would parse DIY_Events_2026.md
   // This is a placeholder for the documented import process
   return {
@@ -390,14 +457,17 @@ async function importReferenceData(adminId: string) {
   };
 }
 
-async function createDemoEvents(adminId: string, communities: any[]) {
-  const events: any[] = [];
+async function createDemoEvents(
+  adminId: string,
+  communities: Array<{ id: string; name: string }>
+) {
+  const events: Array<{ id: string; name: string }> = [];
   const now = new Date();
 
   // PRD 12.2 Scenarios: 8, 9, 10 (standalone event, event with community, event with registration)
 
   // Upcoming events (relative to seed run)
-  const upcomingEvents = [
+  const upcomingEvents: SeedEvent[] = [
     {
       name: "Jogja Marathon 2026",
       description:
@@ -476,7 +546,7 @@ async function createDemoEvents(adminId: string, communities: any[]) {
   ];
 
   // Past events
-  const pastEvents = [
+  const pastEvents: SeedEvent[] = [
     {
       name: "Sleman Photography Workshop 2026",
       description: "Workshop fotografi landscape dan portrait di Sleman.",
@@ -532,17 +602,123 @@ async function createDemoEvents(adminId: string, communities: any[]) {
 
     // Update coordinates if provided
     if (data.coordinates) {
-      await prisma.$executeRawUnsafe(`
+      await prisma.$executeRaw`
         UPDATE "Event"
-        SET coordinates = ST_GeographyFromText('POINT(${data.coordinates.lng} ${data.coordinates.lat})')
-        WHERE id = '${event.id}'
-      `);
+        SET coordinates = ST_SetSRID(
+          ST_MakePoint(${data.coordinates.lng}, ${data.coordinates.lat}),
+          4326
+        )::geography
+        WHERE id = ${event.id}
+      `;
     }
 
     events.push(event);
   }
 
   return events;
+}
+
+/**
+ * Create the demo activity that makes every product flow demonstrable:
+ *
+ * 1. "Full Quota Event Demo" (quota 2) is filled to its quota by two
+ *    different accounts, so "event is full" can be shown.
+ * 2. `user@togather.demo` has one active registration on an upcoming event,
+ *    so `/event-saya?status=TERDAFTAR` has content.
+ * 3. `user@togather.demo` has one registration plus attendance on a past
+ *    event, so `/event-saya?status=RIWAYAT` has content.
+ * 4. `incomplete@togather.demo` has one PENDING join request on a private
+ *    community owned by `organizer@togather.demo`, so the organizer review
+ *    flow can be shown.
+ *
+ * The seed deletes all rows before inserting, so running it twice always
+ * produces exactly the same result.
+ */
+async function createDemoActivity({
+  verifiedUserId,
+  incompleteUserId,
+  organizerUserId,
+  adminUserId,
+  communities,
+}: {
+  verifiedUserId: string;
+  incompleteUserId: string;
+  organizerUserId: string;
+  adminUserId: string;
+  communities: Array<{ id: string; name: string }>;
+}) {
+  const events = await prisma.event.findMany({
+    select: { id: true, name: true },
+  });
+
+  const eventByName = new Map(events.map((e) => [e.name, e.id]));
+  const communityByName = new Map(communities.map((c) => [c.name, c.id]));
+
+  let activeRegistrations = 0;
+  let pastRegistrations = 0;
+  let attendance = 0;
+  let joinRequests = 0;
+
+  // 1. Fill "Full Quota Event Demo" to its quota (2) with two accounts.
+  const fullQuotaEventId = eventByName.get("Full Quota Event Demo");
+  if (fullQuotaEventId) {
+    for (const userId of [organizerUserId, adminUserId]) {
+      await prisma.eventRegistration.create({
+        data: { eventId: fullQuotaEventId, userId },
+      });
+      activeRegistrations++;
+    }
+  }
+
+  // 2. One active registration for the verified user on an upcoming event.
+  const upcomingEventId = eventByName.get("Tech Startup Networking Night");
+  if (upcomingEventId) {
+    await prisma.eventRegistration.create({
+      data: { eventId: upcomingEventId, userId: verifiedUserId },
+    });
+    activeRegistrations++;
+  }
+
+  // 3. One registration + attendance for the verified user on a past event.
+  const pastEventId = eventByName.get("Sleman Photography Workshop 2026");
+  if (pastEventId) {
+    const registration = await prisma.eventRegistration.create({
+      data: { eventId: pastEventId, userId: verifiedUserId },
+    });
+    pastRegistrations++;
+
+    await prisma.eventAttendance.create({
+      data: {
+        registrationId: registration.id,
+        eventId: pastEventId,
+        attended: true,
+        markedAt: new Date(),
+        markedBy: adminUserId,
+      },
+    });
+    attendance++;
+  }
+
+  // 4. One PENDING join request from the incomplete user on a private
+  //    community owned by the organizer user.
+  const privateCommunityId = communityByName.get("Jogja Startup Founders");
+  if (privateCommunityId) {
+    await prisma.communityJoinRequest.create({
+      data: {
+        communityId: privateCommunityId,
+        userId: incompleteUserId,
+        status: "PENDING",
+      },
+    });
+    joinRequests++;
+  }
+
+  return {
+    activeRegistrations,
+    pastRegistrations,
+    attendance,
+    joinRequests,
+  };
 }
 
 main()
