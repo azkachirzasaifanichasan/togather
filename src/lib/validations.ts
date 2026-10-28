@@ -61,15 +61,17 @@ export const createCommunitySchema = z.object({
   categories: z
     .array(z.nativeEnum(InterestCategory))
     .min(1, "Pilih minimal 1 kategori"),
-  externalLinks: z.array(z.string().url("Link tidak valid")).optional(),
-  area: z.nativeEnum(Area).optional(),
-  addressText: z.string().max(300).optional(),
+  // Optional fields also accept `null`, because HTML forms submit empty
+  // selects and inputs as null rather than omitting the key.
+  externalLinks: z.array(z.string().url("Link tidak valid")).nullish(),
+  area: z.nativeEnum(Area).nullish(),
+  addressText: z.string().max(300).nullish(),
   coordinates: z
     .object({
       lat: z.number().min(-90).max(90),
       lng: z.number().min(-180).max(180),
     })
-    .optional(),
+    .nullish(),
 });
 
 export const updateCommunitySubmissionStatusSchema = z.object({
@@ -83,23 +85,25 @@ export const createEventSchema = z.object({
   description: z.string().min(20, "Deskripsi minimal 20 karakter").max(2000),
   category: z.nativeEnum(InterestCategory),
   startDate: z.string().datetime(),
-  endDate: z.string().datetime().optional(),
-  startTime: z.string().max(20).optional(),
-  venue: z.string().max(200).optional(),
-  area: z.nativeEnum(Area).optional(),
+  // Optional fields also accept `null`, because HTML forms submit empty
+  // selects and inputs as null rather than omitting the key.
+  endDate: z.string().datetime().nullish(),
+  startTime: z.string().max(20).nullish(),
+  venue: z.string().max(200).nullish(),
+  area: z.nativeEnum(Area).nullish(),
   coordinates: z
     .object({
       lat: z.number().min(-90).max(90),
       lng: z.number().min(-180).max(180),
     })
-    .optional(),
+    .nullish(),
   organizer: z.string().min(1).max(150),
-  contactInfo: z.string().max(200).optional(),
-  quota: z.number().int().positive().optional(),
+  contactInfo: z.string().max(200).nullish(),
+  quota: z.number().int().positive().nullish(),
   registrationOpen: z.boolean().default(false),
-  fee: z.string().max(50).optional(),
-  externalLink: z.string().url("Link tidak valid").optional(),
-  relatedCommunityId: z.string().cuid().optional(),
+  fee: z.string().max(50).nullish(),
+  externalLink: z.string().url("Link tidak valid").nullish(),
+  relatedCommunityId: z.string().cuid().nullish(),
   dataSource: z.enum(["DEMO", "REFERENCE_UNVERIFIED"]).default("DEMO"),
 });
 
@@ -116,6 +120,47 @@ export const discoveryFilterSchema = z.object({
   area: z.nativeEnum(Area).optional(),
   type: z.enum(["ONLINE", "OFFLINE"]).optional(),
   accessType: z.enum(["PUBLIC", "PRIVATE"]).optional(),
+  search: z.string().min(2).optional(),
+});
+
+export const boundsSchema = z.object({
+  sw_lat: z.number().min(-90).max(90),
+  sw_lng: z.number().min(-180).max(180),
+  ne_lat: z.number().min(-90).max(90),
+  ne_lng: z.number().min(-180).max(180),
+});
+
+/**
+ * Query schema for `GET /api/communities`.
+ *
+ * All fields are optional. Empty strings are treated as "no filter" by the
+ * caller, so `?area=` must not produce a 400.
+ */
+export const communityDiscoveryQuerySchema = z.object({
+  categories: z.array(z.nativeEnum(InterestCategory)).optional(),
+  area: z.nativeEnum(Area).optional(),
+  type: z.enum(["ONLINE", "OFFLINE"]).optional(),
+  accessType: z.enum(["PUBLIC", "PRIVATE"]).optional(),
+  search: z.string().min(2).optional(),
+  bounds: boundsSchema.optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+  distance: z.number().positive().max(100).optional(),
+});
+
+/**
+ * Query schema for `GET /api/events`.
+ */
+export const eventDiscoveryQuerySchema = z.object({
+  categories: z.array(z.nativeEnum(InterestCategory)).optional(),
+  area: z.nativeEnum(Area).optional(),
+  status: z.enum(["MENDATANG", "BERLANGSUNG", "SELESAI"]).optional(),
+  search: z.string().min(2).optional(),
+  startDate: z.string().optional(),
+  bounds: boundsSchema.optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+  distance: z.number().positive().max(100).optional(),
 });
 
 // Registration
@@ -150,3 +195,5 @@ export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type DiscoveryFilterInput = z.infer<typeof discoveryFilterSchema>;
+export type CommunityDiscoveryQuery = z.infer<typeof communityDiscoveryQuerySchema>;
+export type EventDiscoveryQuery = z.infer<typeof eventDiscoveryQuerySchema>;

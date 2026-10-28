@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCommunityById } from "@/server/communities";
+import { getPublicCommunityById } from "@/server/communities";
 import { auth } from "@/lib/auth";
 
 export async function GET(
@@ -11,11 +11,16 @@ export async function GET(
     const session = await auth();
     const userId = session?.user?.id;
 
-    const community = await getCommunityById(id, userId);
+    const community = await getPublicCommunityById(id, userId);
 
     if (!community) {
       return NextResponse.json(
-        { error: "Community not found" },
+        {
+          error: {
+            code: "NOT_FOUND",
+            message: "Community not found",
+          },
+        },
         { status: 404 }
       );
     }
@@ -24,7 +29,12 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching community:", error);
     return NextResponse.json(
-      { error: "Failed to fetch community" },
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to fetch community",
+        },
+      },
       { status: 500 }
     );
   }

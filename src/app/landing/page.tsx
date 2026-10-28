@@ -1,7 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
+import { auth } from "@/lib/auth";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await auth();
   return (
     <div className="min-h-screen bg-white">
       {/* Header / Navigation */}
@@ -9,7 +11,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <Link href="/discovery" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
               <div className="w-10 h-10 bg-[#7960D7] rounded-xl flex items-center justify-center">
                 <Image
                   src="/logo-togather.png"
@@ -40,22 +42,60 @@ export default function LandingPage() {
 
             {/* Auth Buttons */}
             <div className="flex items-center gap-4">
-              <Link
-                href="/login"
-                className="px-6 py-2 text-[#1F2937] hover:text-[#7960D7] font-medium transition-colors"
-              >
-                Log in
-              </Link>
-              <Link
-                href="/register"
-                className="px-6 py-2 bg-[#7960D7] hover:bg-[#6950c7] text-white rounded-full font-medium transition-colors shadow-sm"
-              >
-                Sign up
-              </Link>
+              {session?.user ? (
+                <>
+                  <Link href="/discovery" className="px-6 py-2 text-[#1F2937] hover:text-[#7960D7] font-medium transition-colors">
+                    Discovery
+                  </Link>
+                  <Link href="/profile" className="w-10 h-10 bg-[#7960D7] rounded-full flex items-center justify-center text-white font-bold hover:bg-[#6950c7] transition-colors">
+                    {session.user.name?.charAt(0).toUpperCase() || 'A'}
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="px-6 py-2 text-[#1F2937] hover:text-[#7960D7] font-medium transition-colors"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="px-6 py-2 bg-[#7960D7] hover:bg-[#6950c7] text-white rounded-full font-medium transition-colors shadow-sm"
+                  >
+                    Sign up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
       </header>
+
+      {/* Home Button */}
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        {session?.user ? (
+          <Link
+            href="/discovery"
+            className="inline-flex items-center gap-2 text-sm text-[#7960D7] hover:underline"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            Discovery
+          </Link>
+        ) : (
+          <Link
+            href="/discovery"
+            className="inline-flex items-center gap-2 text-sm text-[#7960D7] hover:underline"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            Home
+          </Link>
+        )}
+      </div>
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-purple-50 via-white to-pink-50 py-20">

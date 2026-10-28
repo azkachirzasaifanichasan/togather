@@ -1,5 +1,4 @@
 import { auth } from '@/lib/auth';
-import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { AccountMenu } from '@/components/AccountMenu';
@@ -8,34 +7,32 @@ import Image from 'next/image';
 export default async function EventPage({
   searchParams,
 }: {
-  searchParams: { tab?: string };
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const session = await auth();
-  
-  if (!session) {
-    redirect('/login');
-  }
+  const { tab } = await searchParams;
+  const activeTab = tab || 'going';
 
-  const activeTab = searchParams.tab || 'going';
-
-  // Get user's event registrations
-  const userRegistrations = await prisma.eventRegistration.findMany({
-    where: {
-      userId: session.user.id,
-      cancelledAt: null, // Only non-cancelled
-    },
-    include: {
-      event: {
+  // Get user's event registrations (only if logged in)
+  const userRegistrations = session
+    ? await prisma.eventRegistration.findMany({
+        where: {
+          userId: session.user.id,
+          cancelledAt: null, // Only non-cancelled
+        },
         include: {
-          relatedCommunities: {
+          event: {
             include: {
-              community: true
-            }
+              relatedCommunities: {
+                include: {
+                  community: true
+                }
+              },
+            },
           },
         },
-      },
-    },
-  });
+      })
+    : [];
 
   // Filter events based on tab
   const now = new Date();
@@ -63,7 +60,7 @@ export default async function EventPage({
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/discovery" className="flex items-center gap-2">
+          <Link href={session ? "/discovery" : "/landing"} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#7960D7] rounded-lg flex items-center justify-center p-1">
               <Image
                 src="/logo-togather.png"
@@ -75,7 +72,7 @@ export default async function EventPage({
             </div>
             <span className="text-xl font-bold text-gray-900">Togather</span>
           </Link>
-          
+
           {/* Search bar */}
           <div className="flex-1 max-w-xl mx-8">
             <div className="flex gap-2">
@@ -102,7 +99,7 @@ export default async function EventPage({
           </div>
 
           <nav className="flex items-center gap-8">
-            <Link href="/discovery" className="text-gray-600 hover:text-gray-900">
+            <Link href={session ? "/discovery" : "/landing"} className="text-gray-600 hover:text-gray-900">
               Home
             </Link>
             <Link href="/komunitas" className="text-gray-600 hover:text-gray-900">
@@ -125,12 +122,16 @@ export default async function EventPage({
               </svg>
             </button>
             <AccountMenu
-              initialUser={{
-                name: session.user.name || session.user.email || 'User',
-                email: session.user.email,
-                avatarUrl: null,
-                isAdmin: session.user.isAdmin ?? false,
-              }}
+              initialUser={
+                session?.user
+                  ? {
+                      name: session.user.name || session.user.email || 'User',
+                      email: session.user.email,
+                      avatarUrl: null,
+                      isAdmin: session.user.isAdmin ?? false,
+                    }
+                  : null
+              }
             />
           </div>
         </div>

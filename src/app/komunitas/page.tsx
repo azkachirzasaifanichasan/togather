@@ -1,5 +1,4 @@
 import { auth } from '@/lib/auth';
-import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { AccountMenu } from '@/components/AccountMenu';
@@ -7,26 +6,24 @@ import Image from 'next/image';
 
 export default async function KomunitasPage() {
   const session = await auth();
-  
-  if (!session) {
-    redirect('/login');
-  }
 
-  // Get user's communities
-  const userCommunities = await prisma.communityMembership.findMany({
-    where: { userId: session.user.id },
-    include: {
-      community: {
+  // Get user's communities (only if logged in)
+  const userCommunities = session
+    ? await prisma.communityMembership.findMany({
+        where: { userId: session.user.id },
         include: {
-          _count: {
-            select: { members: true }
+          community: {
+            include: {
+              _count: {
+                select: { members: true }
+              }
+            }
           }
         }
-      }
-    }
-  });
+      })
+    : [];
 
-  // Get all communities for discovery
+  // Get all communities for discovery (public)
   const allCommunities = await prisma.community.findMany({
     include: {
       _count: {
@@ -45,7 +42,7 @@ export default async function KomunitasPage() {
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/discovery" className="flex items-center gap-2">
+          <Link href={session ? "/discovery" : "/landing"} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#7960D7] rounded-lg flex items-center justify-center p-1">
               <Image
                 src="/logo-togather.png"
@@ -57,9 +54,9 @@ export default async function KomunitasPage() {
             </div>
             <span className="text-xl font-bold text-gray-900">Togather</span>
           </Link>
-          
+
           <nav className="flex items-center gap-8">
-            <Link href="/discovery" className="text-gray-600 hover:text-gray-900">
+            <Link href={session ? "/discovery" : "/landing"} className="text-gray-600 hover:text-gray-900">
               Home
             </Link>
             <Link href="/komunitas" className="text-[#7960D7] font-semibold">
@@ -82,12 +79,16 @@ export default async function KomunitasPage() {
               </svg>
             </button>
             <AccountMenu
-              initialUser={{
-                name: session.user.name || session.user.email || 'User',
-                email: session.user.email,
-                avatarUrl: null,
-                isAdmin: session.user.isAdmin ?? false,
-              }}
+              initialUser={
+                session?.user
+                  ? {
+                      name: session.user.name || session.user.email || 'User',
+                      email: session.user.email,
+                      avatarUrl: null,
+                      isAdmin: session.user.isAdmin ?? false,
+                    }
+                  : null
+              }
             />
           </div>
         </div>

@@ -1,7 +1,14 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 /**
  * Join a public community or request to join a private community.
+ *
+ * Idempotent:
+ * - already a member          -> { status: "already_member" }
+ * - already pending request   -> { status: "request_exists" }
+ * - public and joined         -> { status: "joined" }
+ * - private and requested     -> { status: "request_created" }
  */
 export async function joinCommunity(userId: string, communityId: string) {
   const community = await prisma.community.findUnique({
@@ -12,7 +19,7 @@ export async function joinCommunity(userId: string, communityId: string) {
   });
 
   if (!community || community.submission?.status !== "APPROVED") {
-    throw new Error("Community not found");
+    throw new Error("COMMUNITY_NOT_FOUND");
   }
 
   // Check if already a member
@@ -64,35 +71,82 @@ export async function joinCommunity(userId: string, communityId: string) {
 
 /**
  * Leave a community.
- * Last organizer cannot leave.
+ *
+ * - the last organizer cannot leave            -> Error("LAST_ORGANIZER")
+ * - organizers leaving with others remaining   -> also drop the organizer row
+ * - not a member                               -> { status: "not_member" } (never P2025)
  */
 export async function leaveCommunity(userId: string, communityId: string) {
-  // Check if user is an organizer
-  const organizer = await prisma.communityOrganizer.findUnique({
-    where: {
-      communityId_userId: { communityId, userId },
-    },
-  });
-
-  if (organizer) {
-    // Check if this is the last organizer
-    const organizerCount = await prisma.communityOrganizer.count({
-      where: { communityId },
+  return await prisma.$transaction(async (tx) => {
+    const organizer = await tx.communityOrganizer.findUnique({
+      where: {
+        communityId_userId: { communityId, userId },
+      },
     });
 
-    if (organizerCount === 1) {
-      throw new Error("Last organizer cannot leave the community");
-    }
-  }
+    if (organizer) {
+      const organizerCount = await tx.communityOrganizer.count({
+        where: { communityId },
+      });
 
-  // Delete membership
-  await prisma.communityMembership.delete({
-    where: {
-      communityId_userId: { communityId, userId },
-    },
+      if (organizerCount <= 1) {
+        throw new Error("LAST_ORGANIZER");
+      }
+
+      // Other organizers remain, so this one may step down.
+      await tx.communityOrganizer.delete({
+        where: {
+          communityId_userId: { communityId, userId },
+        },
+      });
+    }
+
+    const membership = await tx.communityMembership.findUnique({
+      where: {
+        communityId_userId: { communityId, userId },
+      },
+    });
+
+    if (!membership) {
+      return { status: "not_member" as const };
+    }
+
+    await tx.communityMembership.delete({
+      where: {
+        communityId_userId: { communityId, userId },
+      },
+    });
+
+    return { status: "left" as const };
+  });
+}
+
+/**
+ * Get the community ids the user organizes.
+ * Used to decide whether the caller may act as an organizer at all.
+ */
+export async function getOrganizedCommunityIds(userId: string) {
+  const rows = await prisma.communityOrganizer.findMany({
+    where: { userId },
+    select: { communityId: true },
   });
 
-  return { status: "left" as const };
+  return rows.map((r) => r.communityId);
+}
+
+/**
+ * Get the community id a join request belongs to.
+ * Returns null when the request does not exist.
+ */
+export async function getJoinRequestCommunityId(
+  requestId: string
+): Promise<string | null> {
+  const request = await prisma.communityJoinRequest.findUnique({
+    where: { id: requestId },
+    select: { communityId: true },
+  });
+
+  return request?.communityId ?? null;
 }
 
 /**
@@ -137,13 +191,38 @@ export async function getPendingJoinRequests(userId: string) {
 }
 
 /**
+ * Check whether `userId` may review requests for `communityId`.
+ * Admins may review any community.
+ */
+export async function canReviewCommunity(
+  userId: string,
+  communityId: string,
+  isAdmin: boolean
+): Promise<boolean> {
+  if (isAdmin) {
+    return true;
+  }
+
+  const organizer = await prisma.communityOrganizer.findUnique({
+    where: {
+      communityId_userId: { communityId, userId },
+    },
+  });
+
+  return !!organizer;
+}
+
+/**
  * Review a join request (approve/reject).
- * Only organizers of the community or admins can review.
+ *
+ * The service verifies that `reviewerId` really is an organizer of the
+ * request's community, or an admin. The parameter alone is never trusted.
  */
 export async function reviewJoinRequest(
   requestId: string,
   action: "APPROVE" | "REJECT",
-  reviewerId: string
+  reviewerId: string,
+  reviewerIsAdmin: boolean
 ) {
   const request = await prisma.communityJoinRequest.findUnique({
     where: { id: requestId },
@@ -152,12 +231,24 @@ export async function reviewJoinRequest(
     },
   });
 
-  if (!request || request.status !== "PENDING") {
-    throw new Error("Request not found or already reviewed");
+  if (!request) {
+    throw new Error("NOT_FOUND");
+  }
+
+  const allowed = await canReviewCommunity(
+    reviewerId,
+    request.communityId,
+    reviewerIsAdmin
+  );
+  if (!allowed) {
+    throw new Error("ORGANIZER_REQUIRED");
+  }
+
+  if (request.status !== "PENDING") {
+    throw new Error("CONFLICT");
   }
 
   return await prisma.$transaction(async (tx) => {
-    // Update request status
     await tx.communityJoinRequest.update({
       where: { id: requestId },
       data: {
@@ -167,13 +258,20 @@ export async function reviewJoinRequest(
       },
     });
 
-    // If approved, create membership
     if (action === "APPROVE") {
-      await tx.communityMembership.create({
-        data: {
+      // Idempotent: the user may already be a member.
+      await tx.communityMembership.upsert({
+        where: {
+          communityId_userId: {
+            communityId: request.communityId,
+            userId: request.userId,
+          },
+        },
+        create: {
           communityId: request.communityId,
           userId: request.userId,
         },
+        update: {},
       });
     }
 
@@ -206,3 +304,5 @@ export async function getCommunityMembers(communityId: string) {
     },
   });
 }
+
+export type MembershipClient = Prisma.TransactionClient;

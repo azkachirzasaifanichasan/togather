@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Map } from "@/components/Map";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { InterestCategory, Area } from "@prisma/client";
 import dynamic from "next/dynamic";
 
@@ -12,7 +15,6 @@ import { SearchBar } from "@/components/Sidebar/SearchBar";
 import { LocationDisplay } from "@/components/Sidebar/LocationDisplay";
 import { FilterBar } from "@/components/Sidebar/FilterBar";
 import { AccountMenu } from "@/components/AccountMenu";
-import Link from "next/link";
 
 export default function DiscoveryPage() {
   const searchParams = useSearchParams();
@@ -94,8 +96,9 @@ export default function DiscoveryPage() {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar Kiri */}
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <Header />
+      <div className="flex flex-1 overflow-hidden">
       <aside className="w-80 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
         {/* Fixed Header Section */}
         <div className="p-6 border-b border-gray-200 space-y-4">
@@ -278,6 +281,8 @@ export default function DiscoveryPage() {
           )}
         </div>
       </main>
+      </div>
+      <Footer />
     </div>
   );
 }

@@ -58,7 +58,7 @@ export async function getAccountContext(): Promise<AccountContext> {
 export async function requireUser() {
   const ctx = await getAccountContext();
   if (ctx.status === "GUEST") {
-    throw new Error("Unauthorized");
+    throw new Error("UNAUTHORIZED");
   }
   return ctx;
 }
@@ -69,7 +69,7 @@ export async function requireUser() {
 export async function requireVerified() {
   const ctx = await requireUser();
   if (ctx.status !== "VERIFIED") {
-    throw new Error("Profile not verified");
+    throw new Error("PROFILE_NOT_VERIFIED");
   }
   return ctx;
 }
@@ -80,7 +80,7 @@ export async function requireVerified() {
 export async function requireAdmin() {
   const ctx = await requireUser();
   if (!ctx.isAdmin) {
-    throw new Error("Admin access required");
+    throw new Error("ADMIN_REQUIRED");
   }
   return ctx;
 }
@@ -92,7 +92,7 @@ export async function requireOrganizer(communityId: string) {
   const ctx = await requireUser();
   const isOrganizer = await ctx.isOrganizer(communityId);
   if (!isOrganizer && !ctx.isAdmin) {
-    throw new Error("Organizer access required");
+    throw new Error("ORGANIZER_REQUIRED");
   }
   return ctx;
 }

@@ -70,11 +70,14 @@ export default async function CommunityProfilePage({
     .map(ec => ec.event)
     .filter(event => event.isPublished && new Date(event.startDate) >= now)
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-  
+
   // Get admin from first organizer
   const admin = community.organizers[0]?.user;
 
-  const isMember = community.members.some(m => m.userId === session.user.id);
+  // Check membership only if logged in
+  const isMember = session
+    ? community.members.some(m => m.userId === session.user.id)
+    : false;
 
   // Membership changes need the resolved community id, so they are defined here.
   async function toggleMembership() {
@@ -115,7 +118,7 @@ export default async function CommunityProfilePage({
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/discovery" className="flex items-center gap-2">
+          <Link href={session ? "/discovery" : "/landing"} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#7960D7] rounded-lg flex items-center justify-center p-1">
               <Image
                 src="/logo-togather.png"
@@ -127,9 +130,9 @@ export default async function CommunityProfilePage({
             </div>
             <span className="text-xl font-bold text-gray-900">Togather</span>
           </Link>
-          
-          <Link 
-            href="/discovery" 
+
+          <Link
+            href={session ? "/discovery" : "/landing"}
             className="flex items-center gap-2 px-4 py-2 bg-[#7960D7] text-white rounded-lg hover:bg-[#6850C7] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

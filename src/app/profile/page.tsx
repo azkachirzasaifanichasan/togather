@@ -244,7 +244,7 @@ export default async function ProfilePage() {
                         {community.name}
                       </span>
                       <span className="text-xs text-[#6B7280]">
-                        {community._count.members} anggota
+                        {community.memberCount} anggota
                       </span>
                     </Link>
                   </li>
