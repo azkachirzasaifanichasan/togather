@@ -1,11 +1,12 @@
 {
     "schema_version": 2,
-    "commit": "02d5b286d6943e6a57aa1be6b60b1e0098536a15",
-    "indexed_at": "2026-10-28T12:22:46Z",
+    "commit": "c16afe7db1e5874c17f96ff496ede07cd5009eff",
+    "indexed_at": "2026-10-28T14:50:10Z",
     "project": "C-Users-kalis-Togather",
-    "nodes": 742,
-    "edges": 1164,
-    "original_size": 4456448,
-    "compressed_size": 654848,
-    "compression_level": 3
+    "nodes": 737,
+    "edges": 1288,
+    "original_size": 4587520,
+    "compressed_size": 768651,
+    "compression_level": 3,
+    "reconcile_basis": "git-clean-head"
 }

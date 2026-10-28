@@ -58,3 +58,4 @@ logs/
 /docs/
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
+.codebase-memory
