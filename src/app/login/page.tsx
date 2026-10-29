@@ -76,7 +76,7 @@ function LoginForm() {
       <div className="max-w-md w-full">
         {/* Logo */}
         <Link href="/landing" className="flex items-center justify-center gap-3 mb-8 hover:opacity-90 transition-opacity">
-          <div className="w-12 h-12 bg-[#7960D7] rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center">
             <Image
               src="/logo-togather.png"
               alt="Togather"

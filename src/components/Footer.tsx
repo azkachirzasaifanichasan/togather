@@ -17,7 +17,7 @@ export function Footer() {
           <div className="mb-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <div className="mb-4 flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#7960D7]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg">
                   <Image
                     src="/logo-togather.png"
                     alt="Togather"

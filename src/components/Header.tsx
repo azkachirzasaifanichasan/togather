@@ -141,7 +141,7 @@ export function Header({ showSearch = true, locationLabel, onLocationChange }: H
       <div className="flex w-full items-center gap-4 px-5 py-3 lg:px-8">
         {/* Logo */}
         <Link href={homeHref} className="flex flex-shrink-0 items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7960D7]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl">
             <Image
               src="/logo-togather.png"
               alt="Togather"
