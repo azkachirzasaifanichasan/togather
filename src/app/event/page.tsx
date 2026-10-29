@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { getUserEventRegistrations } from "@/server/events";
+import { getUpcomingEvents } from "@/server/events";
 import Link from "next/link";
 
 import { Header } from "@/components/Header";
@@ -20,6 +21,7 @@ export default async function EventPage({
   const { tab } = await searchParams;
   const activeTab = TABS.some((item) => item.key === tab) ? (tab as string) : "going";
 
+  // Untuk user login: events yang mereka daftar
   const goingRegistrations = session
     ? await getUserEventRegistrations(session.user.id, "TERDAFTAR")
     : [];
@@ -30,7 +32,21 @@ export default async function EventPage({
   const goingEvents = goingRegistrations.map((r) => r.event);
   const pastEvents = pastRegistrations.map((r) => r.event);
 
-  const currentEvents = activeTab === "going" ? goingEvents : activeTab === "past" ? pastEvents : [];
+  // Untuk guest: upcoming events dari API
+  const upcomingEvents = session ? [] : await getUpcomingEvents();
+
+  // Tentukan events yang akan ditampilkan
+  let currentEvents = [];
+  let isGuestView = false;
+  
+  if (!session) {
+    // Guest: tampilkan upcoming events
+    isGuestView = true;
+    currentEvents = upcomingEvents;
+  } else {
+    // User login: tampilkan sesuai tab
+    currentEvents = activeTab === "going" ? goingEvents : activeTab === "past" ? pastEvents : [];
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -39,11 +55,13 @@ export default async function EventPage({
       <div className="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">Event kamu</h1>
+            <h1 className="text-4xl font-bold text-gray-900">
+              {session ? "Event kamu" : "Upcoming Events"}
+            </h1>
             <p className="mt-2 text-gray-600">
               {session
                 ? `${goingEvents.length} event akan datang · ${pastEvents.length} riwayat`
-                : "Masuk untuk menyimpan dan mengikuti event."}
+                : `Temukan ${upcomingEvents.length} event menarik di sekitar Anda`}
             </p>
           </div>
           <Link
@@ -54,35 +72,76 @@ export default async function EventPage({
           </Link>
         </div>
 
-        <div className="mb-8 flex items-center gap-2 border-b border-gray-200">
-          {TABS.map((item) => (
-            <Link
-              key={item.key}
-              href={`/event?tab=${item.key}`}
-              className={`-mb-px rounded-t-lg px-5 py-3 text-sm font-semibold transition-colors ${
-                activeTab === item.key
-                  ? "bg-[#7960D7] text-white"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-
-        {!session ? (
-          <div className="rounded-xl border border-dashed border-gray-200 py-16 text-center">
-            <h2 className="mb-2 text-2xl font-bold text-gray-900">Masuk dulu, yuk</h2>
-            <p className="mx-auto mb-6 max-w-md text-gray-600">
-              Setelah masuk, event yang kamu daftar akan muncul di sini.
-            </p>
-            <Link
-              href="/login"
-              className="inline-block rounded-lg bg-gray-900 px-6 py-3 font-semibold text-white transition-colors hover:bg-gray-800"
-            >
-              Masuk
-            </Link>
+        {/* Tabs hanya untuk user login */}
+        {session && (
+          <div className="mb-8 flex items-center gap-2 border-b border-gray-200">
+            {TABS.map((item) => (
+              <Link
+                key={item.key}
+                href={`/event?tab=${item.key}`}
+                className={`-mb-px rounded-t-lg px-5 py-3 text-sm font-semibold transition-colors ${
+                  activeTab === item.key
+                    ? "bg-[#7960D7] text-white"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
           </div>
+        )}
+
+        {isGuestView ? (
+          // Guest view: tampilkan upcoming events
+          currentEvents.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 py-16 text-center">
+              <h2 className="mb-2 text-2xl font-bold text-gray-900">Belum ada event</h2>
+              <p className="mx-auto mb-6 max-w-md text-gray-600">
+                Saat ini belum ada event yang akan datang. Coba lagi nanti.
+              </p>
+              <Link
+                href="/discovery"
+                className="inline-block rounded-lg bg-gray-900 px-6 py-3 font-semibold text-white transition-colors hover:bg-gray-800"
+              >
+                Jelajahi event
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {currentEvents.map((event) => {
+                const eventDate = new Date(event.startDate);
+                const day = eventDate.getDate();
+                const month = eventDate
+                  .toLocaleString("id-ID", { month: "short" })
+                  .toUpperCase();
+
+                return (
+                  <Link key={event.id} href={`/event/${event.id}`} className="group block">
+                    <div className="flex gap-5 rounded-xl border border-gray-200 p-5 transition-shadow hover:shadow-lg">
+                      <div className="flex h-20 w-20 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-[#7960D7]">
+                        <span className="text-2xl font-bold text-white">{day}</span>
+                        <span className="text-xs text-purple-100">{month}</span>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <h3 className="mb-1 text-lg font-bold text-gray-900 transition-colors group-hover:text-[#7960D7]">
+                          {event.name}
+                        </h3>
+                        <p className="mb-2 line-clamp-2 text-sm text-gray-600">{event.description}</p>
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                          <span>{event.startTime || "Waktu TBA"}</span>
+                          <span>{event.venue || event.area?.replaceAll("_", " ") || "Lokasi TBA"}</span>
+                          {event.relatedCommunities[0] && (
+                            <span>{event.relatedCommunities[0].name}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )
         ) : currentEvents.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-200 py-16 text-center">
             <h2 className="mb-2 text-2xl font-bold text-gray-900">

@@ -684,3 +684,67 @@ export async function getUserEventRegistrations(
     };
   });
 }
+/**
+ * Get upcoming events for guests (no authentication required)
+ */
+export async function getUpcomingEvents(): Promise<EventSummary[]> {
+  const events = await prisma.event.findMany({
+    where: {
+      isPublished: true,
+      OR: [
+        {
+          startDate: {
+            gte: new Date(),
+          },
+        },
+        {
+          endDate: {
+            gte: new Date(),
+          },
+        },
+      ],
+    },
+    include: {
+      relatedCommunities: {
+        select: {
+          community: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        take: 1,
+      },
+      _count: {
+        select: {
+          registrations: {
+            where: {
+              cancelledAt: null,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      startDate: "asc",
+    },
+    take: 20, // Limit untuk halaman guest
+  });
+
+  const coordinates = await loadEventCoordinates(events.map((e) => e.id));
+
+  return events.map((event) => {
+    const coord = coordinates.get(event.id);
+    // Transform relatedCommunities untuk match format EventSummary
+    const transformedEvent = {
+      ...event,
+      relatedCommunities: event.relatedCommunities.map(rc => rc.community),
+    };
+    return toEventSummary({
+      ...transformedEvent,
+      latitude: coord?.latitude ?? null,
+      longitude: coord?.longitude ?? null,
+    } as EventRow);
+  });
+}

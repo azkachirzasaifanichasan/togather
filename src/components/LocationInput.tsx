@@ -104,8 +104,16 @@ export function LocationInput({ value, onChange }: LocationInputProps) {
               _city: city.toLowerCase(),
             };
           })
-          // Filter ketat: kata kunci harus ada di nama kota/kabupaten, bukan cuma provinsi/jalan
-          .filter((s) => s.label && s._city.includes(qLower))
+          // Filter ketat: prioritaskan match di nama kota, fallback ke label
+          .filter((s) => {
+            if (!s.label) return false;
+            
+            // Jika kota ada dan query ada di nama kota → accept
+            if (s._city && s._city.includes(qLower)) return true;
+            
+            // Jika tidak, cek apakah query ada di label (case-insensitive)
+            return s.label.toLowerCase().includes(qLower);
+          })
 
         // Dedupe by label
         const seen = new Set<string>();

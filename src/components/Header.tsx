@@ -207,7 +207,13 @@ export function Header({ showSearch = true, locationLabel, onLocationChange }: H
           {/* Chat button */}
           <button
             type="button"
-            onClick={() => togglePanel("chat")}
+            onClick={() => {
+              if (!user) {
+                router.push("/login");
+              } else {
+                togglePanel("chat");
+              }
+            }}
             aria-label="Chat"
             aria-expanded={panel === "chat"}
             className={`rounded-full p-2 transition-colors hover:bg-gray-100 ${panel === "chat" ? "bg-gray-100" : ""}`}
@@ -220,7 +226,13 @@ export function Header({ showSearch = true, locationLabel, onLocationChange }: H
           {/* Notifications button */}
           <button
             type="button"
-            onClick={() => togglePanel("notifications")}
+            onClick={() => {
+              if (!user) {
+                router.push("/login");
+              } else {
+                togglePanel("notifications");
+              }
+            }}
             aria-label="Notifikasi"
             aria-expanded={panel === "notifications"}
             className={`rounded-full p-2 transition-colors hover:bg-gray-100 ${panel === "notifications" ? "bg-gray-100" : ""}`}

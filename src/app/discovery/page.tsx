@@ -323,76 +323,85 @@ export default function DiscoveryPage() {
               </div>
             </div>
 
-            {/* Your groups */}
-            <div className="rounded-2xl border border-gray-200 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-[#1F2937]">
-                  Your groups
-                  {communities.length > 0 && (
-                    <span className="ml-1.5 text-xs font-normal text-[#6B7280]">{communities.length}</span>
-                  )}
-                </h3>
-                <Link href="/komunitas" className="text-xs text-[#7960D7] hover:underline">
-                  See all
-                </Link>
-              </div>
-
-              {loading ? (
-                <div className="space-y-3">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="h-10 w-10 flex-shrink-0 animate-pulse rounded-lg bg-gray-100" />
-                      <div className="flex-1 space-y-1.5">
-                        <div className="h-3 w-3/4 animate-pulse rounded bg-gray-100" />
-                        <div className="h-2.5 w-1/2 animate-pulse rounded bg-gray-100" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : communities.length > 0 ? (
-                <div className="space-y-2">
-                  {communities.slice(0, 4).map((community) => (
-                    <Link
-                      key={community.id}
-                      href={`/komunitas/${community.id}`}
-                      className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-gray-50"
-                    >
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#7960D7] text-sm font-bold text-white">
-                        {community.name?.charAt(0) || "C"}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-[#1F2937]">
-                          {community.name}
-                        </p>
-                        <p className="text-xs text-[#6B7280]">
-                          {community.memberCount || 0} members
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-4 text-center">
-                  <p className="mb-1 text-sm font-medium text-[#1F2937]">Find your people!</p>
-                  <p className="mb-3 text-xs text-[#9CA3AF]">
-                    Komunitas sesuai minatmu ada di sini.
-                  </p>
-                  <Link
-                    href="/komunitas"
-                    className="inline-block w-full rounded-full bg-[#1F2937] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#111827]"
-                  >
-                    Explore community
+            {/* Your groups with inner scroll */}
+            <div className="rounded-2xl border border-gray-200">
+              {/* Header */}
+              <div className="border-b border-gray-100 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-[#1F2937]">
+                    Groups
+                    {communities.length > 0 && (
+                      <span className="ml-1.5 text-xs font-normal text-[#6B7280]">{communities.length}</span>
+                    )}
+                  </h3>
+                  <Link href="/komunitas" className="text-xs text-[#7960D7] hover:underline">
+                    See all
                   </Link>
                 </div>
-              )}
+              </div>
 
+              {/* Scrollable content */}
+              <div className="max-h-64 overflow-y-auto px-2 py-2" style={{ scrollbarWidth: "thin" }}>
+                {loading ? (
+                  <div className="space-y-3 px-2">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="h-10 w-10 flex-shrink-0 animate-pulse rounded-lg bg-gray-100" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3 w-3/4 animate-pulse rounded bg-gray-100" />
+                          <div className="h-2.5 w-1/2 animate-pulse rounded bg-gray-100" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : communities.length > 0 ? (
+                  <div className="space-y-1">
+                    {communities.slice(0, 10).map((community) => (
+                      <Link
+                        key={community.id}
+                        href={`/komunitas/${community.id}`}
+                        className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-gray-50"
+                      >
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#7960D7] text-sm font-bold text-white">
+                          {community.name?.charAt(0) || "C"}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-[#1F2937]">
+                            {community.name}
+                          </p>
+                          <p className="text-xs text-[#6B7280]">
+                            {community.memberCount || 0} members
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-3 py-6 text-center">
+                    <p className="mb-1 text-sm font-medium text-[#1F2937]">Find your people!</p>
+                    <p className="mb-3 text-xs text-[#9CA3AF]">
+                      Komunitas sesuai minatmu ada di sini.
+                    </p>
+                    <Link
+                      href="/komunitas"
+                      className="inline-block w-full rounded-full bg-[#1F2937] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#111827]"
+                    >
+                      Explore community
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom link (hanya jika ada komunitas) */}
               {!loading && communities.length > 0 && (
-                <Link
-                  href="/komunitas"
-                  className="mt-3 flex w-full items-center justify-center rounded-full border border-gray-200 py-2 text-xs font-medium text-white transition-colors hover:bg-gray-200 bg-[#1F2937]"
-                >
-                  Find more groups
-                </Link>
+                <div className="border-t border-gray-100 p-3">
+                  <Link
+                    href="/komunitas"
+                    className="flex w-full items-center justify-center rounded-full bg-[#111827] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#6950c7]"
+                  >
+                    Find more groups
+                  </Link>
+                </div>
               )}
             </div>
 

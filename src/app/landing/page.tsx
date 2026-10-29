@@ -28,12 +28,20 @@ export default async function LandingPage() {
                 dayâ€”sign up to join the fun.
               </p>
 
-              <Link
-                href="/register"
-                className="inline-block px-8 py-4 bg-[#7960D7] hover:bg-[#6950c7] text-white rounded-full font-semibold text-lg transition-colors shadow-lg hover:shadow-xl"
-              >
-                Join Togather
-              </Link>
+              <div className="flex flex-wrap gap-4">
+                <Link
+                  href="/register"
+                  className="inline-block px-8 py-4 bg-[#7960D7] hover:bg-[#6950c7] text-white rounded-full font-semibold text-lg transition-colors shadow-lg hover:shadow-xl"
+                >
+                  Join Togather
+                </Link>
+                <Link
+                  href="/discovery"
+                  className="inline-block px-8 py-4 bg-[#1F2937] hover:bg-[#111827] text-white rounded-full font-semibold text-lg transition-colors shadow-lg hover:shadow-xl"
+                >
+                  Discovery
+                </Link>
+              </div>
             </div>
 
             {/* Right Content - Illustrations */}
