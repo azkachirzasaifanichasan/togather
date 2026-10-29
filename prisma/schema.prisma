@@ -1,5 +1,3 @@
-// This is your Prisma schema file
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,14 +7,248 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum DataSource {
-  DEMO
-  REFERENCE_UNVERIFIED
+model Account {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
-enum CommunityType {
-  ONLINE
-  OFFLINE
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model Community {
+  id                   String                 @id
+  name                 String
+  description          String
+  type                 CommunityType
+  accessType           CommunityAccessType
+  categories           InterestCategory[]
+  externalLinks        String[]
+  dataSource           DataSource             @default(DEMO)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  CommunityJoinRequest CommunityJoinRequest[]
+  CommunityLocation    CommunityLocation?
+  CommunityMembership  CommunityMembership[]
+  CommunityOrganizer   CommunityOrganizer[]
+  CommunitySubmission  CommunitySubmission?
+  EventCommunity       EventCommunity[]
+
+  @@index([accessType])
+  @@index([categories])
+  @@index([type])
+}
+
+model CommunityJoinRequest {
+  id          String           @id
+  communityId String
+  userId      String
+  status      SubmissionStatus @default(PENDING)
+  requestedAt DateTime         @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  Community   Community        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  User        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([status])
+  @@index([userId])
+}
+
+model CommunityLocation {
+  id          String                    @id
+  communityId String                    @unique
+  area        Area?
+  coordinates Unsupported("geography")?
+  addressText String?
+  isOnline    Boolean                   @default(false)
+  Community   Community                 @relation(fields: [communityId], references: [id], onDelete: Cascade)
+}
+
+model CommunityMembership {
+  id          String    @id
+  communityId String
+  userId      String
+  joinedAt    DateTime  @default(now())
+  Community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  User        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([userId])
+}
+
+model CommunityOrganizer {
+  id          String    @id
+  communityId String
+  userId      String
+  addedAt     DateTime  @default(now())
+  Community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  User        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([userId])
+}
+
+model CommunitySubmission {
+  id              String           @id
+  communityId     String           @unique
+  userId          String
+  status          SubmissionStatus @default(PENDING)
+  submittedAt     DateTime         @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  rejectionReason String?
+  Community       Community        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  User            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model Event {
+  id                String                    @id
+  name              String
+  description       String
+  category          InterestCategory
+  startDate         DateTime
+  endDate           DateTime?
+  startTime         String?
+  venue             String?
+  area              Area?
+  coordinates       Unsupported("geography")?
+  organizer         String
+  contactInfo       String?
+  quota             Int?
+  registrationOpen  Boolean                   @default(false)
+  fee               String?
+  externalLink      String?
+  dataSource        DataSource                @default(DEMO)
+  isPublished       Boolean                   @default(true)
+  createdBy         String?
+  publishedAt       DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime
+  EventAttendance   EventAttendance[]
+  EventCommunity    EventCommunity[]
+  EventRegistration EventRegistration[]
+
+  @@index([category])
+  @@index([isPublished])
+  @@index([startDate])
+  @@index([category], map: "idx_event_category")
+  @@index([isPublished], map: "idx_event_published")
+  @@index([startDate], map: "idx_event_start_date")
+}
+
+model EventAttendance {
+  id                String            @id
+  registrationId    String            @unique
+  attended          Boolean           @default(false)
+  markedAt          DateTime?
+  markedBy          String?
+  eventId           String?
+  Event             Event?            @relation(fields: [eventId], references: [id])
+  EventRegistration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+}
+
+model EventCommunity {
+  id          String    @id
+  eventId     String
+  communityId String
+  Community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  Event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, communityId])
+  @@index([communityId])
+}
+
+model EventRegistration {
+  id              String           @id
+  eventId         String
+  userId          String
+  registeredAt    DateTime         @default(now())
+  cancelledAt     DateTime?
+  EventAttendance EventAttendance?
+  Event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  User            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+}
+
+model User {
+  id                   String                 @id
+  email                String                 @unique
+  passwordHash         String
+  isAdmin              Boolean                @default(false)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  Account              Account[]
+  CommunityJoinRequest CommunityJoinRequest[]
+  CommunityMembership  CommunityMembership[]
+  CommunityOrganizer   CommunityOrganizer[]
+  CommunitySubmission  CommunitySubmission[]
+  EventRegistration    EventRegistration[]
+  UserActivityHistory  UserActivityHistory[]
+  UserProfile          UserProfile?
+}
+
+model UserActivityHistory {
+  id         String   @id
+  userId     String
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([action])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model UserProfile {
+  id              String             @id
+  userId          String             @unique
+  name            String?
+  phone           String?
+  phoneVerifiedAt DateTime?
+  domicile        Area?
+  interests       InterestCategory[]
+  bio             String?
+  address         String?
+  avatarUrl       String?
+  User            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
+}
+
+enum Area {
+  KOTA_YOGYAKARTA
+  SLEMAN
+  BANTUL
+  KULON_PROGO
+  GUNUNGKIDUL
 }
 
 enum CommunityAccessType {
@@ -24,10 +256,14 @@ enum CommunityAccessType {
   PRIVATE
 }
 
-enum SubmissionStatus {
-  PENDING
-  APPROVED
-  REJECTED
+enum CommunityType {
+  ONLINE
+  OFFLINE
+}
+
+enum DataSource {
+  DEMO
+  REFERENCE_UNVERIFIED
 }
 
 enum InterestCategory {
@@ -43,253 +279,8 @@ enum InterestCategory {
   LAINNYA
 }
 
-enum Area {
-  KOTA_YOGYAKARTA
-  SLEMAN
-  BANTUL
-  KULON_PROGO
-  GUNUNGKIDUL
-}
-
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  isAdmin      Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  profile              UserProfile?
-  accounts             Account[]
-  memberships          CommunityMembership[]
-  organizedCommunities CommunityOrganizer[]
-  joinRequests         CommunityJoinRequest[]
-  submissions          CommunitySubmission[]
-  registrations        EventRegistration[]
-  activities           UserActivityHistory[]
-}
-
-/**
- * Links an external identity provider account (e.g. Google) to a Togather
- * user. One user may have several accounts (password + Google).
- *
- * `provider` + `providerAccountId` is the natural key of the external account.
- */
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-model UserProfile {
-  id              String             @id @default(cuid())
-  userId          String             @unique
-  name            String?
-  phone           String?
-  phoneVerifiedAt DateTime?
-  domicile        Area?
-  address         String?
-  avatarUrl       String?
-  interests       InterestCategory[]
-  bio             String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Community {
-  id            String              @id @default(cuid())
-  name          String
-  description   String
-  type          CommunityType
-  accessType    CommunityAccessType
-  categories    InterestCategory[]
-  externalLinks String[]
-  dataSource    DataSource          @default(DEMO)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-
-  location     CommunityLocation?
-  organizers   CommunityOrganizer[]
-  members      CommunityMembership[]
-  joinRequests CommunityJoinRequest[]
-  submission   CommunitySubmission?
-  events       EventCommunity[]
-
-  @@index([type])
-  @@index([accessType])
-  @@index([categories])
-}
-
-model CommunityLocation {
-  id          String                                @id @default(cuid())
-  communityId String                                @unique
-  area        Area?
-  // PostGIS geography(Point,4326) stored as Unsupported, queried via raw SQL
-  coordinates Unsupported("geography(Point,4326)")?
-  addressText String? // General area description, never precise personal address
-  isOnline    Boolean                               @default(false)
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-}
-
-model CommunityOrganizer {
-  id          String   @id @default(cuid())
-  communityId String
-  userId      String
-  addedAt     DateTime @default(now())
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([communityId, userId])
-  @@index([userId])
-}
-
-model CommunityMembership {
-  id          String   @id @default(cuid())
-  communityId String
-  userId      String
-  joinedAt    DateTime @default(now())
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([communityId, userId])
-  @@index([userId])
-}
-
-model CommunityJoinRequest {
-  id          String           @id @default(cuid())
-  communityId String
-  userId      String
-  status      SubmissionStatus @default(PENDING)
-  requestedAt DateTime         @default(now())
-  reviewedAt  DateTime?
-  reviewedBy  String?
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([communityId, userId])
-  @@index([userId])
-  @@index([status])
-}
-
-model CommunitySubmission {
-  id              String           @id @default(cuid())
-  communityId     String           @unique
-  userId          String
-  status          SubmissionStatus @default(PENDING)
-  submittedAt     DateTime         @default(now())
-  reviewedAt      DateTime?
-  reviewedBy      String?
-  rejectionReason String?
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  submitter User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
-}
-
-model Event {
-  id               String                                @id @default(cuid())
-  name             String
-  description      String
-  category         InterestCategory
-  startDate        DateTime
-  endDate          DateTime?
-  startTime        String? // "14:00 WIB" or null if unannounced
-  venue            String?
-  area             Area?
-  coordinates      Unsupported("geography(Point,4326)")?
-  organizer        String // Organizer name or external account
-  contactInfo      String?
-  quota            Int?
-  registrationOpen Boolean                               @default(false)
-  fee              String? // "Gratis", "Rp 50.000", etc.
-  externalLink     String?
-  dataSource       DataSource                            @default(DEMO)
-  isPublished      Boolean                               @default(true)
-  createdBy        String? // userId of admin who created it
-  publishedAt      DateTime?
-  createdAt        DateTime                              @default(now())
-  updatedAt        DateTime                              @updatedAt
-
-  relatedCommunities EventCommunity[]
-  registrations      EventRegistration[]
-  attendance         EventAttendance[]
-
-  @@index([startDate])
-  @@index([category])
-  @@index([isPublished])
-}
-
-model EventCommunity {
-  id          String @id @default(cuid())
-  eventId     String
-  communityId String
-
-  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-
-  @@unique([eventId, communityId])
-  @@index([communityId])
-}
-
-model EventRegistration {
-  id           String    @id @default(cuid())
-  eventId      String
-  userId       String
-  registeredAt DateTime  @default(now())
-  cancelledAt  DateTime?
-
-  event      Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attendance EventAttendance?
-
-  @@unique([eventId, userId])
-  @@index([userId])
-}
-
-model EventAttendance {
-  id             String    @id @default(cuid())
-  registrationId String    @unique
-  attended       Boolean   @default(false)
-  markedAt       DateTime?
-  markedBy       String? // userId of admin
-
-  registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  event        Event?            @relation(fields: [eventId], references: [id])
-  eventId      String?
-}
-
-model UserActivityHistory {
-  id         String   @id @default(cuid())
-  userId     String
-  action     String // "view_community", "join_community", "register_event", "search"
-  targetType String? // "community", "event"
-  targetId   String?
-  metadata   Json? // Additional context
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

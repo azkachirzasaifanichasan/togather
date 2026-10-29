@@ -688,21 +688,10 @@ export async function getUserEventRegistrations(
  * Get upcoming events for guests (no authentication required)
  */
 export async function getUpcomingEvents(): Promise<EventSummary[]> {
+  // Ambil semua events published untuk demo (tidak peduli tanggal)
   const events = await prisma.event.findMany({
     where: {
       isPublished: true,
-      OR: [
-        {
-          startDate: {
-            gte: new Date(),
-          },
-        },
-        {
-          endDate: {
-            gte: new Date(),
-          },
-        },
-      ],
     },
     include: {
       relatedCommunities: {
@@ -727,7 +716,7 @@ export async function getUpcomingEvents(): Promise<EventSummary[]> {
       },
     },
     orderBy: {
-      startDate: "asc",
+      startDate: "desc", // Urutkan dari yang terbaru
     },
     take: 20, // Limit untuk halaman guest
   });

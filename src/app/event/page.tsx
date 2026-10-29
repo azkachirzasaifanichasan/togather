@@ -56,12 +56,12 @@ export default async function EventPage({
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold text-gray-900">
-              {session ? "Event kamu" : "Upcoming Events"}
+              {session ? "Event kamu" : "Events"}
             </h1>
             <p className="mt-2 text-gray-600">
               {session
                 ? `${goingEvents.length} event akan datang · ${pastEvents.length} riwayat`
-                : `Temukan ${upcomingEvents.length} event menarik di sekitar Anda`}
+                : `Temukan ${upcomingEvents.length} event di sekitar Anda`}
             </p>
           </div>
           <Link

@@ -192,33 +192,70 @@ export default function DiscoveryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const AREA_COORDINATES: Record<string, [number, number]> = {
+    "KOTA_YOGYAKARTA": [-7.7956, 110.3695],
+    "SLEMAN": [-7.7052, 110.3534],
+    "BANTUL": [-7.8875, 110.3287],
+    "KULON_PROGO": [-7.8228, 110.1603],
+    "GUNUNGKIDUL": [-7.9138, 110.6022],
+  };
+
   const markers = useMemo<MapMarker[]>(() => {
     const communityMarkers: MapMarker[] = communities
-      .filter(
-        (community) =>
-          typeof community.latitude === "number" && typeof community.longitude === "number"
-      )
-      .map((community) => ({
-        id: `community-${community.id}`,
-        position: [community.latitude as number, community.longitude as number],
-        type: "community" as const,
-        name: community.name,
-        description: community.description,
-        category: community.area ?? undefined,
-        href: `/komunitas/${community.id}`,
-      }));
+      .map((community) => {
+        // Gunakan koordinat jika ada, fallback ke area centroid
+        let lat = community.latitude;
+        let lng = community.longitude;
+        
+        if (typeof lat !== "number" || typeof lng !== "number") {
+          const areaCoords = community.area ? AREA_COORDINATES[community.area] : null;
+          if (areaCoords) {
+            lat = areaCoords[0];
+            lng = areaCoords[1];
+          }
+        }
+        
+        if (typeof lat !== "number" || typeof lng !== "number") return null;
+        
+        return {
+          id: `community-${community.id}`,
+          position: [lat, lng],
+          type: "community" as const,
+          name: community.name,
+          description: community.description,
+          category: community.area ?? undefined,
+          href: `/komunitas/${community.id}`,
+        };
+      })
+      .filter((marker): marker is MapMarker => marker !== null);
 
     const eventMarkers: MapMarker[] = events
-      .filter((event) => typeof event.latitude === "number" && typeof event.longitude === "number")
-      .map((event) => ({
-        id: `event-${event.id}`,
-        position: [event.latitude as number, event.longitude as number],
-        type: "event" as const,
-        name: event.title ?? event.name ?? "Event",
-        description: event.venue ?? event.description,
-        category: event.area ?? undefined,
-        href: `/event/${event.id}`,
-      }));
+      .map((event) => {
+        // Gunakan koordinat jika ada, fallback ke area centroid
+        let lat = event.latitude;
+        let lng = event.longitude;
+        
+        if (typeof lat !== "number" || typeof lng !== "number") {
+          const areaCoords = event.area ? AREA_COORDINATES[event.area] : null;
+          if (areaCoords) {
+            lat = areaCoords[0];
+            lng = areaCoords[1];
+          }
+        }
+        
+        if (typeof lat !== "number" || typeof lng !== "number") return null;
+        
+        return {
+          id: `event-${event.id}`,
+          position: [lat, lng],
+          type: "event" as const,
+          name: event.title ?? event.name ?? "Event",
+          description: event.venue ?? event.description,
+          category: event.area ?? undefined,
+          href: `/event/${event.id}`,
+        };
+      })
+      .filter((marker): marker is MapMarker => marker !== null);
 
     const meMarkers: MapMarker[] = userLocation
       ? [
@@ -300,26 +337,71 @@ export default function DiscoveryPage() {
               </svg>
             </Link>
 
-            {/* Going | Saved */}
+            {/* Upcoming Events */}
             <div className="overflow-hidden rounded-2xl border border-gray-200">
               <div className="flex items-center justify-between bg-[#7960D7] px-4 py-3 text-white">
-                <div className="flex gap-3 text-sm font-semibold">
-                  <button className="border-b-2 border-white pb-0.5">Going</button>
-                  <span className="opacity-40">|</span>
-                  <button className="opacity-60 hover:opacity-100 transition-opacity">Saved</button>
-                </div>
+                <div className="text-sm font-semibold">Upcoming Events</div>
                 <Link href="/event" className="text-xs hover:underline opacity-80">
                   See all
                 </Link>
               </div>
-              <div className="px-4 py-6 text-center">
-                <p className="mb-3 text-sm text-[#6B7280]">Looks like you&apos;re free</p>
-                <Link
-                  href="/event"
-                  className="inline-block rounded-full bg-[#1F2937] px-5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#111827]"
-                >
-                  Find events
-                </Link>
+              
+              {/* Events list */}
+              <div className="max-h-64 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+                {loading ? (
+                  <div className="space-y-3 p-4">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="h-12 w-12 flex-shrink-0 animate-pulse rounded-lg bg-gray-100" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3 w-3/4 animate-pulse rounded bg-gray-100" />
+                          <div className="h-2.5 w-1/2 animate-pulse rounded bg-gray-100" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : events.length > 0 ? (
+                  <div className="space-y-1 p-2">
+                    {events.slice(0, 5).map((event) => {
+                      const eventDate = new Date(event.startDate);
+                      const day = eventDate.getDate();
+                      const month = eventDate
+                        .toLocaleString("id-ID", { month: "short" })
+                        .toUpperCase();
+                      
+                      return (
+                        <Link
+                          key={event.id}
+                          href={`/event/${event.id}`}
+                          className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-gray-50"
+                        >
+                          <div className="flex h-12 w-12 flex-shrink-0 flex-col items-center justify-center rounded-lg bg-[#7960D7] text-white">
+                            <span className="text-lg font-bold">{day}</span>
+                            <span className="text-[10px] font-medium opacity-80">{month}</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-[#1F2937]">
+                              {event.title ?? event.name}
+                            </p>
+                            <p className="text-xs text-[#6B7280]">
+                              {event.venue ?? event.area?.replaceAll("_", " ") ?? "Lokasi TBA"}
+                            </p>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="px-4 py-6 text-center">
+                    <p className="mb-3 text-sm text-[#6B7280]">No upcoming events</p>
+                    <Link
+                      href="/discovery"
+                      className="inline-block rounded-full bg-[#1F2937] px-5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#111827]"
+                    >
+                      Explore
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
 

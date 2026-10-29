@@ -211,12 +211,11 @@ export function Header({ showSearch = true, locationLabel, onLocationChange }: H
               if (!user) {
                 router.push("/login");
               } else {
-                togglePanel("chat");
+                router.push("/chat");
               }
             }}
             aria-label="Chat"
-            aria-expanded={panel === "chat"}
-            className={`rounded-full p-2 transition-colors hover:bg-gray-100 ${panel === "chat" ? "bg-gray-100" : ""}`}
+            className={`rounded-full p-2 transition-colors hover:bg-gray-100`}
           >
             <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -230,12 +229,11 @@ export function Header({ showSearch = true, locationLabel, onLocationChange }: H
               if (!user) {
                 router.push("/login");
               } else {
-                togglePanel("notifications");
+                router.push("/notifications");
               }
             }}
             aria-label="Notifikasi"
-            aria-expanded={panel === "notifications"}
-            className={`rounded-full p-2 transition-colors hover:bg-gray-100 ${panel === "notifications" ? "bg-gray-100" : ""}`}
+            className={`rounded-full p-2 transition-colors hover:bg-gray-100`}
           >
             <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.03 2.03 0 0118 14.158V11a6 6 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -255,18 +253,12 @@ export function Header({ showSearch = true, locationLabel, onLocationChange }: H
             </svg>
           </button>
 
-          {/* Chat / Notifications / Help placeholder panel */}
-          {(panel === "chat" || panel === "notifications" || panel === "help") && (
+          {/* Help panel */}
+          {panel === "help" && (
             <div className="absolute right-0 top-full z-[1200] mt-2 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
-              <p className="mb-1 text-sm font-semibold text-[#1F2937]">
-                {panel === "chat" ? "Chat komunitas" : panel === "notifications" ? "Notifikasi" : "Bantuan"}
-              </p>
+              <p className="mb-1 text-sm font-semibold text-[#1F2937]">Bantuan</p>
               <p className="text-xs leading-relaxed text-[#6B7280]">
-                {panel === "chat"
-                  ? "Chat komunitas dijadwalkan pada fase pengembangan berikutnya (PRD Fase 2)."
-                  : panel === "notifications"
-                  ? "Notifikasi aktivitas akan tersedia pada fase pengembangan berikutnya."
-                  : "Pusat bantuan dan FAQ tersedia pada fase pengembangan berikutnya."}
+                Pusat bantuan dan FAQ tersedia pada fase pengembangan berikutnya.
               </p>
             </div>
           )}
