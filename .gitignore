@@ -31,10 +31,10 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
+# Ignore every .env* variant so backups like .env.bak can never be committed.
 .env
-.env*.local
-.env.development
-.env.production
+.env*
+!.env.example
 
 # vercel
 .vercel
@@ -56,3 +56,6 @@ logs/
 
 # documentation (private design files)
 /docs/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+.codebase-memory

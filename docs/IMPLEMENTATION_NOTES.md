@@ -155,10 +155,9 @@ Original misspelled folder `docs/refrence/` preserved; working copies in `docs/r
 **Status:** ✅ Successful
 
 **Demo Accounts Created:**
-- Admin: `admin@togather.demo` / `demo123456`
-- Verified User: `user@togather.demo` / `demo123456`
-- Incomplete User: `incomplete@togather.demo` / `demo123456`
-- Organizer: `organizer@togather.demo` / `demo123456`
+- Admin: `Togather@gmail.com` / `Togather30`
+- Operator: `operator@togather.demo` / `demo123456`
+- User (incomplete profile): `user@togather.demo` / `demo123456`
 
 **DEMO Communities:** 11 total
 - Covers all 5 DIY areas (Kota Yogyakarta, Sleman, Bantul, Kulon Progo, Gunungkidul)
@@ -402,12 +401,13 @@ Original misspelled folder `docs/refrence/` preserved; working copies in `docs/r
 
 | Email | Password | Role | Status | Use Case |
 |-------|----------|------|--------|----------|
-| `admin@togather.demo` | `demo123456` | Admin | VERIFIED | Approve submissions, create events, full access |
-| `user@togather.demo` | `demo123456` | User | VERIFIED | Join communities, register for events, submit communities |
-| `incomplete@togather.demo` | `demo123456` | User | INCOMPLETE | Test incomplete profile restrictions (cannot submit communities) |
-| `organizer@togather.demo` | `demo123456` | Organizer | VERIFIED | Manage communities, review join requests |
+| `Togather@gmail.com` | `Togather30` | Admin | VERIFIED | Approve submissions, create events, full access |
+| `operator@togather.demo` | `demo123456` | Operator | VERIFIED | Manage communities, review join requests, submit communities |
+| `user@togather.demo` | `demo123456` | User | INCOMPLETE | Test the profile-completion flow at `/profile` (cannot submit communities until complete) |
 
-**Note:** All passwords are intentionally simple for demo purposes only.
+**Note:** Only two roles exist — Admin (`isAdmin`) and User. "Operator" is not stored;
+it is what a user becomes once phone is verified and domicile + address are filled in.
+All passwords are intentionally simple for demo purposes only.
 
 ---
 

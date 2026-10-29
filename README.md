@@ -111,10 +111,14 @@ Setelah running seed, gunakan akun berikut untuk testing:
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@togather.demo | demo123456 |
-| User | user@togather.demo | demo123456 |
-| Organizer | organizer@togather.demo | demo123456 |
-| Incomplete | incomplete@togather.demo | demo123456 |
+| Admin Togather | Togather@gmail.com | Togather30 |
+| Operator | operator@togather.demo | demo123456 |
+| User (profil belum lengkap) | user@togather.demo | demo123456 |
+
+**Operator bukan role tersimpan.** Hanya ada dua role: Admin (`isAdmin`) dan User.
+Operator adalah user yang profilnya sudah lengkap — nomor HP terverifikasi + domisili +
+alamat. Isi profil di `/profile`, lalu masukkan kode aktivasi 6 digit apa pun (mode demo).
+`user@togather.demo` sengaja dibuat belum lengkap untuk menguji alur ini.
 
 ## 🗂️ Project Structure
 

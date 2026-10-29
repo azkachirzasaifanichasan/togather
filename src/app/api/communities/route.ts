@@ -3,6 +3,7 @@ import { getDiscoveryCommunities, submitCommunity } from "@/server/communities";
 import {
   communityDiscoveryQuerySchema,
   createCommunitySchema,
+  readSearchTerm,
   type CommunityDiscoveryQuery,
 } from "@/lib/validations";
 import { requireVerified } from "@/server/auth";
@@ -24,7 +25,7 @@ function parseQuery(searchParams: URLSearchParams): CommunityDiscoveryQuery {
   const area = searchParams.get("area")?.trim();
   const type = searchParams.get("type")?.trim();
   const accessType = searchParams.get("accessType")?.trim();
-  const search = searchParams.get("search")?.trim();
+  const search = readSearchTerm(searchParams);
 
   const latRaw = searchParams.get("lat")?.trim();
   const lngRaw = searchParams.get("lng")?.trim();

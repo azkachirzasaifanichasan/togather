@@ -25,6 +25,8 @@ export async function PATCH(request: NextRequest) {
         phone: profile.phone,
         phoneVerifiedAt: profile.phoneVerifiedAt,
         domicile: profile.domicile,
+        address: profile.address,
+        avatarUrl: profile.avatarUrl,
         interests: profile.interests,
         bio: profile.bio,
       },

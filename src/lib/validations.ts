@@ -21,10 +21,31 @@ export const updateProfileSchema = z.object({
   name: z.string().min(1, "Nama wajib diisi").max(100),
   phone: z.string().regex(/^(\+62|0)[0-9]{9,12}$/, "Nomor HP tidak valid"),
   domicile: z.nativeEnum(Area, { required_error: "Domisili wajib diisi" }),
+  address: z.string().min(5, "Alamat minimal 5 karakter").max(300),
   interests: z
     .array(z.nativeEnum(InterestCategory))
     .min(1, "Pilih minimal 1 minat"),
   bio: z.string().min(10, "Bio minimal 10 karakter").max(500),
+});
+
+// Profile completion gate: a user only needs verified phone + domicile + address
+// to become an organizer. Name/phone/interests/bio are collected but not required.
+export const completeProfileSchema = z.object({
+  name: z.string().min(1, "Nama wajib diisi").max(100),
+  phone: z.string().regex(/^(\+62|0)[0-9]{9,12}$/, "Nomor HP tidak valid"),
+  domicile: z.nativeEnum(Area, { required_error: "Domisili wajib diisi" }),
+  address: z.string().min(5, "Alamat minimal 5 karakter").max(300),
+  // Empty string = keep the current photo. The uploader sends a downscaled
+  // data URL so no file storage is needed yet.
+  avatarUrl: z
+    .string()
+    .max(300_000, "Foto terlalu besar")
+    .refine((v) => v === "" || v.startsWith("data:image/"), "Foto tidak valid")
+    .optional(),
+  // Shown on the profile page ("My interests" / "About"). Optional so the
+  // organizer gate still passes without them.
+  interests: z.array(z.nativeEnum(InterestCategory)).optional(),
+  bio: z.string().max(500, "Bio maksimal 500 karakter").optional(),
 });
 
 export const activatePhoneSchema = z.object({
@@ -142,6 +163,54 @@ export const eventDiscoveryQuerySchema = z.object({
   distance: z.number().positive().max(100).optional(),
 });
 
+/**
+ * Query parameter names that the discovery endpoints understand.
+ * Anything else is not a filter.
+ */
+const KNOWN_FILTER_PARAMS = new Set([
+  "search",
+  "categories",
+  "area",
+  "type",
+  "accessType",
+  "status",
+  "bounds",
+  "sw_lat",
+  "sw_lng",
+  "ne_lat",
+  "ne_lng",
+  "lat",
+  "lng",
+  "distance",
+  "startDate",
+]);
+
+/**
+ * Read the search term from a discovery query string.
+ *
+ * `?search=searook` is the canonical form. A bare `?searook` (a valueless
+ * unknown parameter) is also accepted as the search term, so the demo URL in
+ * the API contract works as written. A valueless *known* filter (`?area=`) is
+ * ignored, and an unknown parameter that carries a value (`?utm_source=x`) is
+ * ignored too — only a bare `?term` is treated as a search.
+ */
+export function readSearchTerm(
+  searchParams: URLSearchParams
+): string | undefined {
+  const explicit = searchParams.get("search")?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  for (const [key, value] of searchParams.entries()) {
+    if (value === "" && !KNOWN_FILTER_PARAMS.has(key)) {
+      return key;
+    }
+  }
+
+  return undefined;
+}
+
 // Registration
 export const registerEventSchema = z.object({
   eventId: z.string().cuid(),
@@ -169,6 +238,7 @@ export const reviewJoinRequestSchema = z.object({
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type CompleteProfileInput = z.infer<typeof completeProfileSchema>;
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;

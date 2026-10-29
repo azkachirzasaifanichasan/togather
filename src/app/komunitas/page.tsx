@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getDiscoveryCommunities, getUserCommunities } from "@/server/communities";
 import Link from "next/link";
 
 import { Header } from "@/components/Header";
@@ -14,44 +14,10 @@ export default async function KomunitasPage({
   const { q } = await searchParams;
   const query = q?.trim() ?? "";
 
-  const userCommunities = session
-    ? await prisma.communityMembership.findMany({
-        where: {
-          userId: session.user.id,
-          community: { submission: { status: "APPROVED" } },
-        },
-        include: {
-          community: {
-            include: {
-              _count: { select: { members: true } },
-            },
-          },
-        },
-      })
-    : [];
+  const userCommunities = session ? await getUserCommunities(session.user.id) : [];
+  const allCommunities = await getDiscoveryCommunities(query ? { search: query } : {});
 
-  const allCommunities = await prisma.community.findMany({
-    where: {
-      submission: { status: "APPROVED" },
-      ...(query
-        ? {
-            OR: [
-              { name: { contains: query, mode: "insensitive" as const } },
-              { description: { contains: query, mode: "insensitive" as const } },
-            ],
-          }
-        : {}),
-    },
-    include: {
-      _count: { select: { members: true } },
-      location: true,
-    },
-    orderBy: {
-      members: { _count: "desc" },
-    },
-  });
-
-  const memberIds = new Set(userCommunities.map((membership) => membership.community.id));
+  const memberIds = new Set(userCommunities.map((c) => c.id));
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -86,24 +52,22 @@ export default async function KomunitasPage({
             <div className="mb-6">
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Komunitasmu</h3>
               <div className="space-y-2">
-                {userCommunities.map((membership) => (
+                {userCommunities.map((community) => (
                   <Link
-                    key={membership.community.id}
-                    href={`/komunitas/${membership.community.id}`}
+                    key={community.id}
+                    href={`/komunitas/${community.id}`}
                     className="group flex items-center gap-3 rounded-lg p-2 hover:bg-gray-100"
                   >
                     <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-200">
                       <span className="font-semibold text-gray-700">
-                        {membership.community.name.charAt(0)}
+                        {community.name.charAt(0)}
                       </span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-gray-900">
-                        {membership.community.name}
+                        {community.name}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        {membership.community._count.members} anggota
-                      </p>
+                      <p className="text-xs text-gray-500">{community.memberCount} anggota</p>
                     </div>
                   </Link>
                 ))}
@@ -126,11 +90,12 @@ export default async function KomunitasPage({
             <h1 className="mb-2 text-3xl font-bold text-gray-900">Jelajahi komunitas</h1>
             <p className="text-gray-600">
               {query
-                ? `${allCommunities.length} komunitas cocok dengan “${query}”`
+                ? `${allCommunities.length} komunitas cocok dengan "${query}"`
                 : `${allCommunities.length} komunitas aktif di DIY`}
             </p>
           </div>
 
+          {/* Search bar for mobile */}
           <form action="/komunitas" method="get" className="mb-6 lg:hidden">
             <div className="relative">
               <input
@@ -178,7 +143,7 @@ export default async function KomunitasPage({
                         <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                         </svg>
-                        <span>{community._count.members} anggota</span>
+                        <span>{community.memberCount} anggota</span>
                       </div>
 
                       <div className="flex items-center gap-2">

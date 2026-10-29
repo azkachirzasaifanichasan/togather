@@ -1,10 +1,11 @@
-import { auth } from '@/lib/auth';
-import { notFound } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import Link from 'next/link';
-import Image from 'next/image';
-import { Header } from '@/components/Header';
-import { JoinButton } from '@/components/communities/JoinButton';
+import { auth } from "@/lib/auth";
+import { redirect, notFound } from "next/navigation";
+import { getCommunityProfileById, getUserCommunities } from "@/server/communities";
+import Link from "next/link";
+import Image from "next/image";
+
+import { Header } from "@/components/Header";
+import { JoinButton } from "@/components/communities/JoinButton";
 
 export default async function CommunityProfilePage({
   params,
@@ -13,158 +14,83 @@ export default async function CommunityProfilePage({
 }) {
   const session = await auth();
 
+  if (!session) {
+    redirect("/login");
+  }
+
   const { id } = await params;
 
-  const community = await prisma.community.findUnique({
-    where: { id },
-    include: {
-      members: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              profile: {
-                select: {
-                  name: true
-                }
-              }
-            }
-          },
-        },
-      },
-      organizers: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              profile: {
-                select: {
-                  name: true
-                }
-              }
-            }
-          }
-        }
-      },
-      events: {
-        include: {
-          event: true
-        }
-      },
-      submission: true,
-    },
-  });
+  const community = await getCommunityProfileById(id, session.user.id);
 
-  if (!community || community.submission?.status !== 'APPROVED') {
+  if (!community) {
     notFound();
   }
 
-  // Extract upcoming events from EventCommunity relation
-  const now = new Date();
-  const upcomingEvents = community.events
-    .map(ec => ec.event)
-    .filter(event => event.isPublished && new Date(event.startDate) >= now)
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  const { upcomingEvents } = community;
+  const admin = community.hosts[0];
+  const isMember = community.isMember;
 
-  // Get admin from first organizer
-  const admin = community.organizers[0]?.user;
-
-  // Check membership only if logged in
-  const isMember = session
-    ? community.members.some(m => m.userId === session.user.id)
-    : false;
-
-  const joinRequest =
-    session && !isMember && community.accessType === 'PRIVATE'
-      ? await prisma.communityJoinRequest.findUnique({
-          where: {
-            communityId_userId: {
-              communityId: community.id,
-              userId: session.user.id,
-            },
-          },
-          select: { status: true },
-        })
-      : null;
-
-  // Get user's communities for sidebar only if logged in
-  const userCommunities = session
-    ? await prisma.communityMembership.findMany({
-        where: { userId: session.user.id },
-        include: {
-          community: {
-            include: {
-              _count: {
-                select: { members: true }
-              }
-            }
-          }
-        },
-        take: 4
-      })
-    : [];
+  // Get user's communities for sidebar
+  const userCommunities = (await getUserCommunities(session.user.id)).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-white">
       <Header />
 
-      <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
+      <div className="mx-auto max-w-7xl px-6 py-8 flex gap-8">
         {/* Sidebar */}
         <aside className="w-64 flex-shrink-0">
-          <div className="sticky top-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Community</h2>
-            
-            {/* Search */}
+          <div className="sticky top-24">
+            <h2 className="mb-6 text-2xl font-bold text-gray-900">Community</h2>
+
             <div className="mb-6">
               <div className="relative">
                 <input
                   type="text"
                   placeholder="Search communities"
-                  className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7960D7] focus:border-transparent text-sm"
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#7960D7]"
                 />
-                <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
             </div>
 
-            {/* Your community */}
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Your community</h3>
+              <h3 className="mb-3 text-sm font-semibold text-gray-700">Your community</h3>
               <div className="space-y-2">
                 {userCommunities.map((membership) => {
-                  const isActive = membership.community.id === community.id;
+                  const isActive = membership.id === community.id;
                   return (
                     <Link
-                      key={membership.community.id}
-                      href={`/komunitas/${membership.community.id}`}
-                      className={`flex items-center gap-3 p-2 rounded-lg group ${
-                        isActive ? 'bg-[#7960D7] bg-opacity-10' : 'hover:bg-gray-100'
+                      key={membership.id}
+                      href={`/komunitas/${membership.id}`}
+                      className={`flex items-center gap-3 rounded-lg p-2 group ${
+                        isActive ? "bg-[#7960D7]/10" : "hover:bg-gray-100"
                       }`}
                     >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        isActive ? 'bg-[#7960D7]' : 'bg-gray-200'
-                      }`}>
-                        <span className={`font-semibold ${
-                          isActive ? 'text-white' : 'text-gray-700'
-                        }`}>
-                          {membership.community.name.charAt(0)}
+                      <div
+                        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${
+                          isActive ? "bg-[#7960D7]" : "bg-gray-200"
+                        }`}
+                      >
+                        <span className={`font-semibold ${isActive ? "text-white" : "text-gray-700"}`}>
+                          {membership.name.charAt(0)}
                         </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold truncate ${
-                          isActive ? 'text-[#7960D7]' : 'text-gray-900'
-                        }`}>
-                          {membership.community.name}
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm font-semibold ${isActive ? "text-[#7960D7]" : "text-gray-900"}`}>
+                          {membership.name}
                         </p>
-                        <p className="text-xs text-gray-500">
-                          {membership.community._count.members} members
-                        </p>
+                        <p className="text-xs text-gray-500">{membership.memberCount} members</p>
                       </div>
                       {isActive && (
-                        <svg className="w-5 h-5 text-[#7960D7] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="h-5 w-5 flex-shrink-0 text-[#7960D7]" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       )}
@@ -173,32 +99,24 @@ export default async function CommunityProfilePage({
                 })}
               </div>
             </div>
-
-            {/* Create community button */}
-            <button className="w-full bg-gray-900 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors text-sm">
-              Create community
-            </button>
           </div>
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 max-w-4xl">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Profile Community</h1>
-          
-          {/* Back button */}
+        <main className="min-w-0 flex-1 max-w-4xl">
           <Link
             href="/komunitas"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+            className="mb-6 inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Back to communities
           </Link>
 
-          {/* Community header with image */}
-          <div className="relative h-64 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl overflow-hidden mb-8">
-            <div className="absolute inset-0 bg-black bg-opacity-20"></div>
+          {/* Community header image */}
+          <div className="relative h-64 overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 mb-8">
+            <div className="absolute inset-0 bg-black/20" />
             <Image
               src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80"
               alt={community.name}
@@ -209,10 +127,10 @@ export default async function CommunityProfilePage({
           </div>
 
           {/* Community info */}
-          <div className="flex items-start justify-between mb-8">
+          <div className="mb-8 flex items-start justify-between">
             <div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">{community.name}</h2>
-              <p className="text-gray-600 text-lg leading-relaxed max-w-2xl">
+              <h2 className="mb-4 text-4xl font-bold text-gray-900">{community.name}</h2>
+              <p className="max-w-2xl text-lg leading-relaxed text-gray-600">
                 {community.description}
               </p>
             </div>
@@ -221,35 +139,35 @@ export default async function CommunityProfilePage({
               isMember={isMember}
               accessType={community.accessType}
               isLoggedIn={Boolean(session?.user)}
-              initialRequestStatus={joinRequest?.status ?? null}
+              initialRequestStatus={null}
             />
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-12">
-            <div className="bg-[#7960D7] text-white rounded-2xl p-6">
-              <p className="text-5xl font-bold mb-2">{community.members.length}</p>
-              <p className="text-purple-100 text-sm">members</p>
+          <div className="mb-12 grid grid-cols-3 gap-4">
+            <div className="rounded-2xl bg-[#7960D7] p-6 text-white">
+              <p className="mb-2 text-5xl font-bold">{community.memberCount}</p>
+              <p className="text-sm text-purple-100">members</p>
             </div>
-            <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
-              <p className="text-5xl font-bold text-gray-900 mb-2">{upcomingEvents.length}</p>
-              <p className="text-gray-600 text-sm">upcoming events</p>
+            <div className="rounded-2xl border-2 border-gray-200 bg-white p-6">
+              <p className="mb-2 text-5xl font-bold text-gray-900">{upcomingEvents.length}</p>
+              <p className="text-sm text-gray-600">upcoming events</p>
             </div>
-            <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
-              <p className="text-2xl font-bold text-gray-900 mb-2">
-                {community.accessType === 'PUBLIC' ? 'Publik' : 'Privat'}
+            <div className="rounded-2xl border-2 border-gray-200 bg-white p-6">
+              <p className="mb-2 text-2xl font-bold text-gray-900">
+                {community.accessType === "PUBLIC" ? "Publik" : "Privat"}
               </p>
-              <p className="text-gray-600 text-sm">
-                {community.type === 'ONLINE' ? 'Komunitas online' : 'Komunitas offline'}
+              <p className="text-sm text-gray-600">
+                {community.type === "ONLINE" ? "Komunitas online" : "Komunitas offline"}
               </p>
             </div>
           </div>
 
           {/* Upcoming events */}
           <div className="mb-12">
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6 flex items-center justify-between">
               <h3 className="text-2xl font-bold text-gray-900">Upcoming events</h3>
-              <Link href="/event" className="text-[#7960D7] font-semibold hover:underline">
+              <Link href="/event" className="font-semibold text-[#7960D7] hover:underline">
                 See all
               </Link>
             </div>
@@ -257,24 +175,24 @@ export default async function CommunityProfilePage({
               {upcomingEvents.map((event) => {
                 const eventDate = new Date(event.startDate);
                 const day = eventDate.getDate();
-                const month = eventDate.toLocaleString('en', { month: 'short' }).toUpperCase();
-                
+                const month = eventDate.toLocaleString("en", { month: "short" }).toUpperCase();
+
                 return (
                   <Link
                     key={event.id}
                     href={`/event/${event.id}`}
-                    className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:shadow-md transition-shadow group"
+                    className="group flex items-center gap-4 rounded-xl border border-gray-200 p-4 transition-shadow hover:shadow-md"
                   >
-                    <div className="w-16 h-16 bg-[#7960D7] rounded-xl flex flex-col items-center justify-center flex-shrink-0">
+                    <div className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-[#7960D7]">
                       <span className="text-2xl font-bold text-white">{day}</span>
                       <span className="text-xs text-purple-200">{month}</span>
                     </div>
                     <div className="flex-1">
-                      <h4 className="font-bold text-gray-900 group-hover:text-[#7960D7] transition-colors">
+                      <h4 className="font-bold text-gray-900 transition-colors group-hover:text-[#7960D7]">
                         {event.name}
                       </h4>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {event.startTime || 'TBA'} • {event.venue || 'TBA'}
+                      <p className="mt-1 text-sm text-gray-600">
+                        {event.startTime || "TBA"} · {event.venue || "TBA"}
                       </p>
                     </div>
                     <span className="text-sm font-medium text-[#7960D7] group-hover:underline">
@@ -284,37 +202,31 @@ export default async function CommunityProfilePage({
                 );
               })}
               {upcomingEvents.length === 0 && (
-                <p className="text-gray-500 text-center py-8">No upcoming events</p>
+                <p className="py-8 text-center text-gray-500">No upcoming events</p>
               )}
             </div>
           </div>
 
           {/* Hosted by */}
           <div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Hosted by</h3>
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+            <h3 className="mb-6 text-2xl font-bold text-gray-900">Hosted by</h3>
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">
-                    {admin?.profile?.name?.charAt(0).toUpperCase() || 'A'}
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500">
+                  <span className="text-lg font-bold text-white">
+                    {admin?.name?.charAt(0).toUpperCase() || "A"}
                   </span>
                 </div>
                 <div>
-                  <p className="font-bold text-gray-900">{admin?.profile?.name || 'Anonymous'}</p>
+                  <p className="font-bold text-gray-900">{admin?.name || "Anonymous"}</p>
                   <p className="text-sm text-gray-600">
-                    Community host • {upcomingEvents.length} events hosted
+                    Community host · {upcomingEvents.length} events hosted
                   </p>
                 </div>
               </div>
-              <button className="p-2 hover:bg-gray-100 rounded-full">
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </button>
             </div>
           </div>
         </main>
-
       </div>
     </div>
   );

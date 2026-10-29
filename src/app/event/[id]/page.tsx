@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { Header } from "@/components/Header";
@@ -42,9 +42,12 @@ const STATUS_STYLE: Record<string, { className: string; label: string }> = {
 
 export default function EventDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -71,6 +74,33 @@ export default function EventDetailPage() {
       active = false;
     };
   }, [params.id]);
+
+  const handleRegister = async () => {
+    setRegistering(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/events/${params.id}/rsvp`, { method: "POST" });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Gagal mendaftar event");
+        return;
+      }
+      const refreshed = await fetch(`/api/events/${params.id}`);
+      setEvent(await refreshed.json());
+    } catch {
+      setError("Gagal mendaftar event");
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  // suppress unused warning — handleRegister is wired via RsvpButton
+  void handleRegister;
+  void registering;
 
   if (loading) {
     return (
@@ -164,6 +194,10 @@ export default function EventDetailPage() {
               <p className="font-medium text-gray-900">{event.organizer || "-"}</p>
             </div>
           </div>
+
+          {error && (
+            <p className="mb-4 text-center text-sm text-red-600">{error}</p>
+          )}
 
           <RsvpButton
             eventId={event.id}

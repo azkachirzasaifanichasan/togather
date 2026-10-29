@@ -40,11 +40,6 @@ interface Coordinates {
   lng: number;
 }
 
-interface SessionUser {
-  name?: string | null;
-  email?: string | null;
-}
-
 export default function DiscoveryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,26 +52,22 @@ export default function DiscoveryPage() {
   const [events, setEvents] = useState<EventResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<SessionUser | null>(null);
 
   const [selectedCategories, setSelectedCategories] = useState<InterestCategory[]>([]);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [locationState, setLocationState] = useState<LocationState>("idle");
   const [radius, setRadius] = useState<number | null>(null);
 
+  // undefined = still loading, null = signed out
+  const [me, setMe] = useState<
+    { name: string; avatarUrl: string | null } | null | undefined
+  >(undefined);
+
   useEffect(() => {
-    let active = true;
-
-    fetch("/api/auth/session")
+    fetch("/api/me")
       .then((res) => res.json())
-      .then((data) => {
-        if (active) setUser(data?.user ?? null);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      active = false;
-    };
+      .then((data) => setMe(data.user ?? null))
+      .catch(() => setMe(null));
   }, []);
 
   const handleAreaChange = useCallback(
@@ -209,138 +200,148 @@ export default function DiscoveryPage() {
     void fetchData();
   };
 
-  const initial =
-    user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "U";
-
   return (
     <div className="flex min-h-screen flex-col bg-white">
+      {/* Header navbar terpisah di atas */}
       <Header />
 
       <div className="mx-auto flex w-full max-w-[1500px] flex-1 gap-8 px-6 py-8">
+        {/* Sidebar kiri */}
         <aside className="hidden w-80 flex-shrink-0 lg:block">
           <div className="space-y-5">
-              {/* User Profile Card */}
-              <Link
-                href={user ? "/profile" : "/login"}
-                className="block cursor-pointer rounded-2xl bg-gray-50 p-4 transition-colors hover:bg-gray-100"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7960D7] font-bold text-white">
-                      {initial}
+            {/* User Profile Card */}
+            <Link
+              href={me !== null ? "/profile" : "/login"}
+              className="block cursor-pointer rounded-2xl bg-gray-50 p-4 transition-colors hover:bg-gray-100"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {me?.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={me.avatarUrl}
+                      alt={me.name}
+                      className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#7960D7] font-bold text-white">
+                      {me ? me.name.charAt(0).toUpperCase() : "?"}
                     </div>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-[#1F2937]">{user?.name || "Guest"}</span>
-                      <span className="text-xs text-[#6B7280]">
-                        {user ? "View profile" : "Log in to continue"}
-                      </span>
-                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="truncate font-medium text-[#1F2937]">
+                      {me === undefined ? "" : me ? me.name : "Masuk / Daftar"}
+                    </span>
+                    {me !== null && (
+                      <span className="text-xs text-[#6B7280]">View profile</span>
+                    )}
                   </div>
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
                 </div>
-              </Link>
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </Link>
 
-              {/* Doing | Saved Section */}
-              <div className="overflow-hidden rounded-2xl border border-gray-200">
-                <div className="flex items-center justify-between bg-[#7960D7] px-5 py-3 text-white">
-                  <div className="flex gap-4">
-                    <span className="border-b-2 border-white pb-0.5 font-semibold">Doing</span>
-                    <span className="opacity-50">|</span>
-                    <span className="font-semibold opacity-70">Saved</span>
-                  </div>
-                  <Link href="/event" className="text-sm hover:underline">
-                    See all
-                  </Link>
+            {/* Doing | Saved Section */}
+            <div className="overflow-hidden rounded-2xl border border-gray-200">
+              <div className="flex items-center justify-between bg-[#7960D7] px-5 py-3 text-white">
+                <div className="flex gap-4">
+                  <span className="border-b-2 border-white pb-0.5 font-semibold">Doing</span>
+                  <span className="opacity-50">|</span>
+                  <span className="font-semibold opacity-70">Saved</span>
                 </div>
-
-                <div className="px-5 py-8 text-center">
-                  <p className="mb-4 text-sm text-[#6B7280]">Looks like you&apos;re free</p>
-                  <Link
-                    href="/event"
-                    className="inline-block rounded-full bg-[#1F2937] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#111827]"
-                  >
-                    Find events
-                  </Link>
-                </div>
+                <Link href="/event" className="text-sm hover:underline">
+                  See all
+                </Link>
               </div>
 
-              {/* Filter Bar */}
-              <FilterBar
-                selectedCategories={selectedCategories}
-                selectedArea={selectedArea}
-                onCategoriesChange={setSelectedCategories}
-                onAreaChange={handleAreaChange}
-                radius={radius}
-                onRadiusChange={setRadius}
-                locationState={locationState}
-                onRequestLocation={requestLocation}
-              />
+              <div className="px-5 py-8 text-center">
+                <p className="mb-4 text-sm text-[#6B7280]">Looks like you&apos;re free</p>
+                <Link
+                  href="/event"
+                  className="inline-block rounded-full bg-[#1F2937] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#111827]"
+                >
+                  Find events
+                </Link>
+              </div>
+            </div>
 
-              {/* Community Section */}
-              <div className="rounded-2xl border border-gray-200 p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-bold text-[#1F2937]">Community</h3>
-                  <Link href="/komunitas" className="text-sm text-[#7960D7] hover:underline">
-                    See all
-                  </Link>
+            {/* Filter Bar */}
+            <FilterBar
+              selectedCategories={selectedCategories}
+              selectedArea={selectedArea}
+              onCategoriesChange={setSelectedCategories}
+              onAreaChange={handleAreaChange}
+              radius={radius}
+              onRadiusChange={setRadius}
+              locationState={locationState}
+              onRequestLocation={requestLocation}
+            />
+
+            {/* Community Section */}
+            <div className="rounded-2xl border border-gray-200 p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-bold text-[#1F2937]">Community</h3>
+                <Link href="/komunitas" className="text-sm text-[#7960D7] hover:underline">
+                  See all
+                </Link>
+              </div>
+
+              {loading ? (
+                <div className="space-y-3">
+                  {[0, 1, 2].map((index) => (
+                    <div key={index} className="h-16 animate-pulse rounded-xl bg-gray-100" />
+                  ))}
                 </div>
-
-                {loading ? (
-                  <div className="space-y-3">
-                    {[0, 1, 2].map((index) => (
-                      <div key={index} className="h-16 animate-pulse rounded-xl bg-gray-100" />
-                    ))}
-                  </div>
-                ) : communities.length > 0 ? (
-                  <div className="space-y-3">
-                    {communities.slice(0, 5).map((community) => (
-                      <Link
-                        key={community.id}
-                        href={`/komunitas/${community.id}`}
-                        className="block rounded-xl bg-gray-50 p-3 transition-colors hover:bg-gray-100"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#7960D7] font-bold text-white">
-                            {community.name?.charAt(0) || "C"}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="truncate text-sm font-medium text-[#1F2937]">
-                              {community.name}
-                            </h4>
-                            <p className="mt-0.5 line-clamp-2 text-xs text-[#6B7280]">
-                              {community.description}
-                            </p>
-                            <div className="mt-1 flex items-center gap-2 text-xs text-[#6B7280]">
-                              <span>{community.memberCount || 0} members</span>
-                              {community.area && (
-                                <>
-                                  <span>•</span>
-                                  <span>{community.area}</span>
-                                </>
-                              )}
-                            </div>
+              ) : communities.length > 0 ? (
+                <div className="space-y-3">
+                  {communities.slice(0, 5).map((community) => (
+                    <Link
+                      key={community.id}
+                      href={`/komunitas/${community.id}`}
+                      className="block rounded-xl bg-gray-50 p-3 transition-colors hover:bg-gray-100"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#7960D7] font-bold text-white">
+                          {community.name?.charAt(0) || "C"}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate text-sm font-medium text-[#1F2937]">
+                            {community.name}
+                          </h4>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-[#6B7280]">
+                            {community.description}
+                          </p>
+                          <div className="mt-1 flex items-center gap-2 text-xs text-[#6B7280]">
+                            <span>{community.memberCount || 0} members</span>
+                            {community.area && (
+                              <>
+                                <span>•</span>
+                                <span>{community.area}</span>
+                              </>
+                            )}
                           </div>
                         </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-6 text-center">
-                    <p className="mb-2 text-sm font-medium text-[#1F2937]">Find your people!</p>
-                    <p className="mb-4 text-xs text-[#9CA3AF]">
-                      Groups that share your passions and keep you connected IRL.
-                    </p>
-                    <Link
-                      href="/komunitas"
-                      className="inline-block w-full rounded-full bg-[#1F2937] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#111827]"
-                    >
-                      Explore community
+                      </div>
                     </Link>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-6 text-center">
+                  <p className="mb-2 text-sm font-medium text-[#1F2937]">Find your people!</p>
+                  <p className="mb-4 text-xs text-[#9CA3AF]">
+                    Groups that share your passions and keep you connected IRL.
+                  </p>
+                  <Link
+                    href="/komunitas"
+                    className="inline-block w-full rounded-full bg-[#1F2937] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#111827]"
+                  >
+                    Explore community
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         </aside>
 

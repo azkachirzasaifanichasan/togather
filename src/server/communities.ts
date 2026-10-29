@@ -249,6 +249,81 @@ export async function getDiscoveryCommunities(
 }
 
 /**
+ * Server-side view of a community profile page.
+ *
+ * The public DTO (`getPublicCommunityById`) is what the API exposes; a
+ * server-rendered page may also show the hosts and the upcoming events, so
+ * this adds exactly those two and nothing more.
+ */
+export async function getCommunityProfileById(
+  communityId: string,
+  userId?: string
+) {
+  const community = await prisma.community.findUnique({
+    where: { id: communityId },
+    include: {
+      location: true,
+      submission: { select: { status: true } },
+      organizers: {
+        include: {
+          user: { select: { id: true, profile: { select: { name: true } } } },
+        },
+      },
+      events: {
+        include: { event: true },
+      },
+      _count: { select: { members: true } },
+    },
+  });
+
+  if (!community || community.submission?.status !== "APPROVED") {
+    return null;
+  }
+
+  const isMember = userId
+    ? (await prisma.communityMembership.count({
+        where: { communityId, userId },
+      })) > 0
+    : false;
+
+  const now = new Date();
+  const upcomingEvents = community.events
+    .map((ec) => ec.event)
+    .filter((e) => e.isPublished && e.startDate >= now)
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+    .map((e) => ({
+      id: e.id,
+      name: e.name,
+      startDate: e.startDate,
+      startTime: e.startTime,
+      venue: e.venue,
+    }));
+
+  const coordinates = await loadCommunityCoordinates([community.id]);
+  const coord = coordinates.get(community.id);
+
+  return {
+    id: community.id,
+    name: community.name,
+    description: community.description,
+    type: community.type,
+    accessType: community.accessType,
+    categories: community.categories,
+    area: community.location?.area ?? null,
+    addressText: community.location?.addressText ?? null,
+    latitude: coord?.latitude ?? null,
+    longitude: coord?.longitude ?? null,
+    memberCount: community._count.members,
+    isMember,
+    hosts: community.organizers.map((o) => ({
+      id: o.user.id,
+      name: o.user.profile?.name ?? null,
+    })),
+    upcomingEvents,
+  };
+}
+
+/**
  * Get community by ID with full details.
  * Returns null if community is not approved or doesn't exist.
  */

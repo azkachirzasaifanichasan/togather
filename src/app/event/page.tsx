@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getUserEventRegistrations } from "@/server/events";
 import Link from "next/link";
 
 import { Header } from "@/components/Header";
@@ -20,38 +20,15 @@ export default async function EventPage({
   const { tab } = await searchParams;
   const activeTab = TABS.some((item) => item.key === tab) ? (tab as string) : "going";
 
-  const registrations = session
-    ? await prisma.eventRegistration.findMany({
-        where: {
-          userId: session.user.id,
-          cancelledAt: null,
-        },
-        include: {
-          event: {
-            include: {
-              relatedCommunities: {
-                include: { community: true },
-              },
-            },
-          },
-        },
-      })
+  const goingRegistrations = session
+    ? await getUserEventRegistrations(session.user.id, "TERDAFTAR")
+    : [];
+  const pastRegistrations = session
+    ? await getUserEventRegistrations(session.user.id, "RIWAYAT")
     : [];
 
-  const now = new Date();
-
-  const withCommunity = registrations.map((registration) => ({
-    ...registration.event,
-    community: registration.event.relatedCommunities[0]?.community ?? null,
-  }));
-
-  const goingEvents = withCommunity
-    .filter((event) => new Date(event.startDate) >= now)
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-
-  const pastEvents = withCommunity
-    .filter((event) => new Date(event.startDate) < now)
-    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  const goingEvents = goingRegistrations.map((r) => r.event);
+  const pastEvents = pastRegistrations.map((r) => r.event);
 
   const currentEvents = activeTab === "going" ? goingEvents : activeTab === "past" ? pastEvents : [];
 
@@ -152,7 +129,9 @@ export default async function EventPage({
                       <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
                         <span>{event.startTime || "Waktu TBA"}</span>
                         <span>{event.venue || event.area?.replaceAll("_", " ") || "Lokasi TBA"}</span>
-                        {event.community && <span>{event.community.name}</span>}
+                        {event.relatedCommunities[0] && (
+                          <span>{event.relatedCommunities[0].name}</span>
+                        )}
                       </div>
                     </div>
                   </div>
