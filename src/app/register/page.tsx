@@ -87,7 +87,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <Link href="/landing" className="mb-8 flex items-center justify-center gap-3 transition-opacity hover:opacity-90">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#7960D7]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl">
             <Image src="/logo-togather.png" alt="Togather" width={36} height={36} className="object-contain" />
           </div>
           <span className="text-2xl font-bold text-[#1F2937]">Togather</span>

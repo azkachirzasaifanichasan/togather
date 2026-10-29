@@ -7,6 +7,7 @@ import { getUserCommunities } from "@/server/communities";
 import { getUserEventRegistrations } from "@/server/events";
 
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 
 const AREA_LABEL: Record<Area, string> = {
   KOTA_YOGYAKARTA: "Kota Yogyakarta",
@@ -57,10 +58,10 @@ export default async function ProfilePage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
+    <div className="flex min-h-screen flex-col bg-[#F9FAFB]">
       <Header />
 
-      <div className="mx-auto max-w-5xl grid items-start gap-6 px-4 py-8 md:grid-cols-[320px_1fr] md:px-6">
+      <div className="mx-auto w-full max-w-5xl flex-1 grid items-start gap-6 px-4 py-8 md:grid-cols-[320px_1fr] md:px-6">
         {/* Left card */}
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="relative mx-auto w-fit md:mx-0">
@@ -223,6 +224,8 @@ export default async function ProfilePage() {
           </section>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }
