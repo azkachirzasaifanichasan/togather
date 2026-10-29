@@ -53,7 +53,7 @@ export default function LoginPage() {
         router.push("/");
         router.refresh();
       }
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -138,9 +138,9 @@ export default function LoginPage() {
                 <input type="checkbox" className="rounded border-gray-300 text-[#7960D7] focus:ring-[#7960D7]" />
                 <span className="ml-2 text-sm text-[#6B7280]">Remember me</span>
               </label>
-              <Link href="#" className="text-sm text-[#7960D7] hover:underline">
-                Forgot password?
-              </Link>
+              <span className="cursor-default text-sm text-gray-500" title="Segera hadir">
+                Lupa password?
+              </span>
             </div>
 
             {/* Submit Button */}
@@ -185,7 +185,7 @@ export default function LoginPage() {
           )}
           {/* Sign Up Link */}
           <div className="mt-6 text-center text-sm text-[#6B7280]">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/register" className="text-[#7960D7] font-semibold hover:underline">
               Sign up
             </Link>

@@ -1,11 +1,21 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
 
+interface SidebarMembership {
+  id: string;
+  community?: { name?: string | null; category?: string | null } | null;
+}
+
+interface SidebarSavedItem {
+  id: string;
+  name?: string | null;
+}
+
 interface DoingSavedSectionProps {
-  memberships?: any[];
-  savedItems?: any[];
+  memberships?: SidebarMembership[];
+  savedItems?: SidebarSavedItem[];
 }
 
 export function DoingSavedSection({ memberships = [], savedItems = [] }: DoingSavedSectionProps) {
@@ -41,7 +51,7 @@ export function DoingSavedSection({ memberships = [], savedItems = [] }: DoingSa
 
       {activeTab === "doing" && !hasDoing && (
         <div className="text-center py-6">
-          <p className="text-white/90 mb-4">Looks like you're free</p>
+          <p className="text-white/90 mb-4">Looks like you&apos;re free</p>
           <Link
             href="/event"
             className="inline-block bg-[#1F2937] hover:bg-[#111827] text-white px-6 py-2 rounded-full text-sm font-medium transition-colors"
@@ -53,7 +63,7 @@ export function DoingSavedSection({ memberships = [], savedItems = [] }: DoingSa
 
       {activeTab === "doing" && hasDoing && (
         <div className="space-y-3">
-          {memberships.slice(0, 3).map((membership: any) => (
+          {memberships.slice(0, 3).map((membership) => (
             <div key={membership.id} className="bg-white/10 rounded-lg p-3 hover:bg-white/20 transition-colors cursor-pointer">
               <h4 className="font-medium text-sm">{membership.community?.name}</h4>
               <p className="text-xs text-white/70 mt-1">{membership.community?.category}</p>
@@ -70,7 +80,7 @@ export function DoingSavedSection({ memberships = [], savedItems = [] }: DoingSa
 
       {activeTab === "saved" && hasSaved && (
         <div className="space-y-3">
-          {savedItems.slice(0, 3).map((item: any) => (
+          {savedItems.slice(0, 3).map((item) => (
             <div key={item.id} className="bg-white/10 rounded-lg p-3 hover:bg-white/20 transition-colors cursor-pointer">
               <h4 className="font-medium text-sm">{item.name}</h4>
             </div>

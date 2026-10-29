@@ -92,7 +92,7 @@ export default function RegisterPage() {
         router.push("/");
         router.refresh();
       }
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -213,13 +213,13 @@ export default function RegisterPage() {
               />
               <label className="ml-2 text-sm text-[#6B7280]">
                 I agree to the{" "}
-                <Link href="#" className="text-[#7960D7] hover:underline">
+                <span className="text-[#7960D7]" title="Segera hadir">
                   Terms of Service
-                </Link>{" "}
+                </span>{" "}
                 and{" "}
-                <Link href="#" className="text-[#7960D7] hover:underline">
+                <span className="text-[#7960D7]" title="Segera hadir">
                   Privacy Policy
-                </Link>
+                </span>
               </label>
             </div>
 

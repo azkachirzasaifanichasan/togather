@@ -44,5 +44,11 @@
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^2.1.8"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "prisma@6.19.3": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.21.5": true
   }
 }

@@ -1,265 +1,378 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Map } from "@/components/Map";
+import { Area, InterestCategory } from "@prisma/client";
+
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { InterestCategory, Area } from "@prisma/client";
-import dynamic from "next/dynamic";
+import { Map, YOGYAKARTA_CENTER, type MapMarker } from "@/components/Map";
+import { FilterBar, type LocationState } from "@/components/Sidebar/FilterBar";
 
-// Import sidebar components
-import { Logo } from "@/components/Sidebar/Logo";
-import { SearchBar } from "@/components/Sidebar/SearchBar";
-import { LocationDisplay } from "@/components/Sidebar/LocationDisplay";
-import { FilterBar } from "@/components/Sidebar/FilterBar";
+interface CommunityResult {
+  id: string;
+  name: string;
+  description: string;
+  categories?: InterestCategory[];
+  type?: "ONLINE" | "OFFLINE";
+  area?: Area | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  memberCount?: number;
+}
+
+interface EventResult {
+  id: string;
+  title: string;
+  name?: string;
+  description: string;
+  category?: InterestCategory;
+  venue?: string | null;
+  area?: Area | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  attendeeCount?: number;
+}
+
+interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+interface SessionUser {
+  name?: string | null;
+  email?: string | null;
+}
 
 export default function DiscoveryPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [communities, setCommunities] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
+
+  const searchQuery = searchParams.get("search") ?? "";
+  const areaParam = searchParams.get("area") ?? "";
+  const selectedArea = areaParam ? (areaParam as Area) : null;
+
+  const [communities, setCommunities] = useState<CommunityResult[]>([]);
+  const [events, setEvents] = useState<EventResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
+
   const [selectedCategories, setSelectedCategories] = useState<InterestCategory[]>([]);
-  const [selectedAreas, setSelectedAreas] = useState<Area[]>([]);
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [locationState, setLocationState] = useState<LocationState>("idle");
+  const [radius, setRadius] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data) => {
+        if (active) setUser(data?.user ?? null);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleAreaChange = useCallback(
+    (area: Area | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (area) {
+        params.set("area", area);
+      } else {
+        params.delete("area");
+      }
+      const query = params.toString();
+      router.replace(`/discovery${query ? `?${query}` : ""}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     try {
-      // Build query params
       const params = new URLSearchParams();
-      if (searchQuery) params.append("search", searchQuery);
-      selectedCategories.forEach((cat) => params.append("categories", cat));
-      selectedAreas.forEach((area) => params.append("area", area));
+      if (searchQuery) params.set("search", searchQuery);
+      selectedCategories.forEach((category) => params.append("categories", category));
+      if (selectedArea) params.set("area", selectedArea);
+      if (userLocation) {
+        params.set("lat", String(userLocation.lat));
+        params.set("lng", String(userLocation.lng));
+        if (radius) params.set("distance", String(radius));
+      }
 
-      const [commRes, eventRes] = await Promise.all([
-        fetch(`/api/communities?${params}`),
-        fetch(`/api/events?${params}`),
+      const query = params.toString();
+      const [communitiesRes, eventsRes] = await Promise.all([
+        fetch(`/api/communities${query ? `?${query}` : ""}`),
+        fetch(`/api/events${query ? `?${query}` : ""}`),
       ]);
 
-      const commData = await commRes.json();
-      const eventData = await eventRes.json();
+      const communitiesData = await communitiesRes.json();
+      const eventsData = await eventsRes.json();
 
-      setCommunities(Array.isArray(commData.communities) ? commData.communities : []);
-      setEvents(Array.isArray(eventData.events) ? eventData.events : []);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
+      setCommunities(Array.isArray(communitiesData.communities) ? communitiesData.communities : []);
+      setEvents(Array.isArray(eventsData.events) ? eventsData.events : []);
+      setError(
+        communitiesRes.ok && eventsRes.ok
+          ? null
+          : "Sebagian data gagal dimuat. Coba muat ulang halaman."
+      );
+    } catch (fetchError) {
+      console.error("Failed to fetch discovery data:", fetchError);
       setCommunities([]);
       setEvents([]);
+      setError("Gagal memuat data. Periksa koneksi lalu coba lagi.");
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedCategories, selectedAreas]);
+  }, [searchQuery, selectedCategories, selectedArea, userLocation, radius]);
 
   useEffect(() => {
-    fetchData();
+    queueMicrotask(() => {
+      void fetchData();
+    });
   }, [fetchData]);
 
-  const markers = [
-    ...communities
-      .filter((c) => c.latitude && c.longitude)
-      .map((c) => ({
-        id: c.id,
-        position: [c.latitude, c.longitude] as [number, number],
+  const requestLocation = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationState("unsupported");
+      return;
+    }
+
+    setLocationState("loading");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setLocationState("granted");
+      },
+      () => setLocationState("denied"),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+    );
+  }, []);
+
+  const markers = useMemo<MapMarker[]>(() => {
+    const communityMarkers: MapMarker[] = communities
+      .filter(
+        (community) =>
+          typeof community.latitude === "number" && typeof community.longitude === "number"
+      )
+      .map((community) => ({
+        id: `community-${community.id}`,
+        position: [community.latitude as number, community.longitude as number],
         type: "community" as const,
-        name: c.name,
-        description: c.description,
-        category: c.categories?.[0],
-        memberCount: c.memberCount,
-        onClick: () => window.location.href = `/komunitas/${c.id}`,
-      })),
-    ...events
-      .filter((e) => e.latitude && e.longitude)
-      .map((e) => ({
-        id: e.id,
-        position: [e.latitude, e.longitude] as [number, number],
+        name: community.name,
+        description: community.description,
+        category: community.area ?? undefined,
+        href: `/komunitas/${community.id}`,
+      }));
+
+    const eventMarkers: MapMarker[] = events
+      .filter((event) => typeof event.latitude === "number" && typeof event.longitude === "number")
+      .map((event) => ({
+        id: `event-${event.id}`,
+        position: [event.latitude as number, event.longitude as number],
         type: "event" as const,
-        name: e.title,
-        description: e.description,
-        category: e.category,
-        onClick: () => window.location.href = `/event/${e.id}`,
-      })),
-  ];
+        name: event.title ?? event.name ?? "Event",
+        description: event.venue ?? event.description,
+        category: event.area ?? undefined,
+        href: `/event/${event.id}`,
+      }));
+
+    const meMarkers: MapMarker[] = userLocation
+      ? [
+          {
+            id: "me",
+            position: [userLocation.lat, userLocation.lng],
+            type: "me" as const,
+            name: "Lokasi kamu",
+          },
+        ]
+      : [];
+
+    return [...meMarkers, ...communityMarkers, ...eventMarkers];
+  }, [communities, events, userLocation]);
+
+  const mapCenter = useMemo<[number, number]>(
+    () => (userLocation ? [userLocation.lat, userLocation.lng] : YOGYAKARTA_CENTER),
+    [userLocation]
+  );
+
+  const refresh = () => {
+    setLoading(true);
+    void fetchData();
+  };
+
+  const initial =
+    user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "U";
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-white">
       <Header />
-      <div className="flex flex-1 overflow-hidden">
-      <aside className="w-80 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-        {/* Fixed Header Section */}
-        <div className="p-6 border-b border-gray-200 space-y-4">
-          <Logo />
-          <SearchBar onSearch={setSearchQuery} />
-          <LocationDisplay />
-        </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 space-y-6">
-            {/* User Profile Card - Authenticated State */}
-            <Link href="/profile" className="block bg-gray-50 rounded-xl p-4 hover:bg-gray-100 cursor-pointer transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#7960D7] rounded-full flex items-center justify-center text-white font-bold">
-                    U
+      <div className="mx-auto flex w-full max-w-[1500px] flex-1 gap-8 px-6 py-8">
+        <aside className="hidden w-80 flex-shrink-0 lg:block">
+          <div className="space-y-5">
+              {/* User Profile Card */}
+              <Link
+                href={user ? "/profile" : "/login"}
+                className="block cursor-pointer rounded-2xl bg-gray-50 p-4 transition-colors hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7960D7] font-bold text-white">
+                      {initial}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-[#1F2937]">{user?.name || "Guest"}</span>
+                      <span className="text-xs text-[#6B7280]">
+                        {user ? "View profile" : "Log in to continue"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="font-medium text-[#1F2937]">User</span>
-                    <span className="text-xs text-[#6B7280]">View profile</span>
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </Link>
+
+              {/* Doing | Saved Section */}
+              <div className="overflow-hidden rounded-2xl border border-gray-200">
+                <div className="flex items-center justify-between bg-[#7960D7] px-5 py-3 text-white">
+                  <div className="flex gap-4">
+                    <span className="border-b-2 border-white pb-0.5 font-semibold">Doing</span>
+                    <span className="opacity-50">|</span>
+                    <span className="font-semibold opacity-70">Saved</span>
                   </div>
-                </div>
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </Link>
-
-            {/* Doing | Saved Section */}
-            <div className="bg-[#7960D7] rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-4">
-                  <span className="font-semibold border-b-2 border-white pb-1">Doing</span>
-                  <span className="opacity-50">|</span>
-                  <span className="font-semibold opacity-70">Saved</span>
-                </div>
-                <button className="text-sm hover:underline">See all</button>
-              </div>
-              
-              <div className="text-center py-6">
-                <p className="text-white/90 mb-4">Looks like you're free</p>
-                <Link
-                  href="/event"
-                  className="inline-block bg-[#1F2937] hover:bg-[#111827] text-white px-6 py-2 rounded-full text-sm font-medium transition-colors"
-                >
-                  Find events
-                </Link>
-              </div>
-            </div>
-
-            {/* Filter Bar */}
-            <FilterBar
-              selectedCategories={selectedCategories}
-              selectedAreas={selectedAreas}
-              onCategoriesChange={setSelectedCategories}
-              onAreasChange={setSelectedAreas}
-            />
-
-            {/* Community Section */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-[#1F2937]">Community</h3>
-                <Link href="/komunitas" className="text-sm text-[#7960D7] hover:underline">
-                  See all
-                </Link>
-              </div>
-
-              {communities.length > 0 ? (
-                <div className="space-y-3">
-                  {communities.slice(0, 5).map((community) => (
-                    <Link
-                      key={community.id}
-                      href={`/komunitas/${community.id}`}
-                      className="block bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-[#7960D7] rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
-                          {community.name?.charAt(0) || "C"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-[#1F2937] truncate">
-                            {community.name}
-                          </h4>
-                          <p className="text-xs text-[#6B7280] mt-1 line-clamp-2">
-                            {community.description}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2 text-xs text-[#6B7280]">
-                            <span>{community.memberCount || 0} members</span>
-                            {community.area && (
-                              <>
-                                <span>•</span>
-                                <span>{community.area}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-sm text-[#6B7280] mb-4">Find your people!</p>
-                  <p className="text-xs text-[#9CA3AF] mb-4">
-                    Groups that share your passions and keep you connected IRL.
-                  </p>
-                  <Link
-                    href="/komunitas"
-                    className="inline-block w-full bg-[#1F2937] hover:bg-[#111827] text-white px-4 py-2.5 rounded-full text-sm font-medium transition-colors"
-                  >
-                    Explore community
+                  <Link href="/event" className="text-sm hover:underline">
+                    See all
                   </Link>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col">
-        {/* Top Navigation */}
-        <header className="bg-white border-b border-gray-200 px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-[#1F2937]">Discovery</h1>
-            
-            <div className="flex items-center gap-4">
-              <Link href="/" className="px-6 py-2 bg-[#7960D7] text-white rounded-full font-medium hover:bg-[#6950c7] transition-colors">
-                Home
-              </Link>
-              <Link href="/komunitas" className="px-6 py-2 text-[#1F2937] hover:bg-gray-50 rounded-full font-medium transition-colors">
-                Community
-              </Link>
-              <Link href="/event" className="px-6 py-2 text-[#1F2937] hover:bg-gray-50 rounded-full font-medium transition-colors">
-                Event
-              </Link>
-              
-              <div className="flex items-center gap-3 ml-4">
-                <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                </button>
-                <Link href="/profile">
-                  <div className="w-8 h-8 bg-[#7960D7] rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:bg-[#6950c7] transition-colors">
-                    U
+                <div className="px-5 py-8 text-center">
+                  <p className="mb-4 text-sm text-[#6B7280]">Looks like you&apos;re free</p>
+                  <Link
+                    href="/event"
+                    className="inline-block rounded-full bg-[#1F2937] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#111827]"
+                  >
+                    Find events
+                  </Link>
+                </div>
+              </div>
+
+              {/* Filter Bar */}
+              <FilterBar
+                selectedCategories={selectedCategories}
+                selectedArea={selectedArea}
+                onCategoriesChange={setSelectedCategories}
+                onAreaChange={handleAreaChange}
+                radius={radius}
+                onRadiusChange={setRadius}
+                locationState={locationState}
+                onRequestLocation={requestLocation}
+              />
+
+              {/* Community Section */}
+              <div className="rounded-2xl border border-gray-200 p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-bold text-[#1F2937]">Community</h3>
+                  <Link href="/komunitas" className="text-sm text-[#7960D7] hover:underline">
+                    See all
+                  </Link>
+                </div>
+
+                {loading ? (
+                  <div className="space-y-3">
+                    {[0, 1, 2].map((index) => (
+                      <div key={index} className="h-16 animate-pulse rounded-xl bg-gray-100" />
+                    ))}
                   </div>
-                </Link>
+                ) : communities.length > 0 ? (
+                  <div className="space-y-3">
+                    {communities.slice(0, 5).map((community) => (
+                      <Link
+                        key={community.id}
+                        href={`/komunitas/${community.id}`}
+                        className="block rounded-xl bg-gray-50 p-3 transition-colors hover:bg-gray-100"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#7960D7] font-bold text-white">
+                            {community.name?.charAt(0) || "C"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="truncate text-sm font-medium text-[#1F2937]">
+                              {community.name}
+                            </h4>
+                            <p className="mt-0.5 line-clamp-2 text-xs text-[#6B7280]">
+                              {community.description}
+                            </p>
+                            <div className="mt-1 flex items-center gap-2 text-xs text-[#6B7280]">
+                              <span>{community.memberCount || 0} members</span>
+                              {community.area && (
+                                <>
+                                  <span>•</span>
+                                  <span>{community.area}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-6 text-center">
+                    <p className="mb-2 text-sm font-medium text-[#1F2937]">Find your people!</p>
+                    <p className="mb-4 text-xs text-[#9CA3AF]">
+                      Groups that share your passions and keep you connected IRL.
+                    </p>
+                    <Link
+                      href="/komunitas"
+                      className="inline-block w-full rounded-full bg-[#1F2937] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#111827]"
+                    >
+                      Explore community
+                    </Link>
+                  </div>
+                )}
               </div>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex min-w-0 flex-1 flex-col">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold text-[#1F2937]">Discovery</h1>
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-[#6B7280]">
+                {loading
+                  ? "Memuat peta..."
+                  : `${communities.length} komunitas · ${events.length} event`}
+              </span>
+              {error && <span className="text-xs text-red-600">{error}</span>}
+              <button
+                type="button"
+                onClick={refresh}
+                className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-medium text-[#1F2937] transition-colors hover:bg-gray-50"
+              >
+                Muat ulang
+              </button>
             </div>
           </div>
-        </header>
 
-        {/* Map Container */}
-        <div className="flex-1 relative">
-          {loading ? (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-              <div className="text-center">
-                <div className="w-12 h-12 border-4 border-[#7960D7] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-[#6B7280]">Memuat peta...</p>
-              </div>
-            </div>
-          ) : (
-            <Map markers={markers} />
-          )}
-        </div>
-      </main>
+          {/* Map Container */}
+          <div className="relative h-[620px] w-full overflow-hidden rounded-2xl border border-gray-200">
+            <Map center={mapCenter} markers={markers} />
+          </div>
+        </main>
       </div>
+
       <Footer />
     </div>
   );

@@ -4,120 +4,135 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
+import { Header } from "@/components/Header";
+import { RsvpButton } from "@/components/events/RsvpButton";
+
+interface RelatedCommunity {
+  id: string;
+  name: string;
+}
+
+interface EventDetail {
+  id: string;
+  name: string;
+  description: string;
+  status: "MENDATANG" | "BERLANGSUNG" | "SELESAI";
+  startDate: string;
+  endDate?: string | null;
+  startTime?: string | null;
+  venue?: string | null;
+  area?: string | null;
+  organizer?: string | null;
+  contactInfo?: string | null;
+  quota?: number | null;
+  registrationOpen: boolean;
+  fee?: string | null;
+  externalLink?: string | null;
+  dataSource?: string;
+  isRegistered?: boolean;
+  relatedCommunities?: RelatedCommunity[];
+  _count?: { registrations?: number };
+}
+
+const STATUS_STYLE: Record<string, { className: string; label: string }> = {
+  MENDATANG: { className: "bg-green-100 text-green-800", label: "Akan datang" },
+  BERLANGSUNG: { className: "bg-blue-100 text-blue-800", label: "Sedang berlangsung" },
+  SELESAI: { className: "bg-gray-100 text-gray-800", label: "Selesai" },
+};
+
 export default function EventDetailPage() {
-  const params = useParams();
-  const [event, setEvent] = useState<any>(null);
-  const [session, setSession] = useState<any>(null);
+  const params = useParams<{ id: string }>();
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const getSession = async () => {
-      const res = await fetch("/api/auth/session");
-      const data = await res.json();
-      setSession(data);
-    };
+    let active = true;
 
-    getSession();
-
-    fetch(`/api/events/${params.id}`)
+    fetch("/api/auth/session")
       .then((res) => res.json())
       .then((data) => {
+        if (active) setIsLoggedIn(Boolean(data?.user));
+      })
+      .catch(() => undefined);
+
+    fetch(`/api/events/${params.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active) return;
         setEvent(data);
         setLoading(false);
       })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
+      .catch(() => {
+        if (active) setLoading(false);
       });
+
+    return () => {
+      active = false;
+    };
   }, [params.id]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Memuat...</p>
+      <div className="min-h-screen bg-white">
+        <Header />
+        <div className="mx-auto max-w-4xl px-4 py-16">
+          <div className="h-64 animate-pulse rounded-xl bg-gray-100" />
+        </div>
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl font-bold text-gray-900 mb-2">Event tidak ditemukan</p>
-          <Link href="/" className="text-[#7960D7] hover:underline">Kembali ke Beranda</Link>
+      <div className="min-h-screen bg-white">
+        <Header />
+        <div className="mx-auto max-w-4xl px-4 py-20 text-center">
+          <p className="mb-2 text-xl font-bold text-gray-900">Event tidak ditemukan</p>
+          <Link href="/event" className="text-[#7960D7] hover:underline">
+            Kembali ke daftar event
+          </Link>
         </div>
       </div>
     );
   }
 
-  const statusBadge = {
-    MENDATANG: "bg-green-100 text-green-800",
-    BERLANGSUNG: "bg-blue-100 text-blue-800",
-    SELESAI: "bg-gray-100 text-gray-800",
-  }[event.status as keyof typeof statusBadgeMap] || "bg-gray-100 text-gray-800";
-
-  const statusBadgeMap = {
-    MENDATANG: "bg-green-100 text-green-800",
-    BERLANGSUNG: "bg-blue-100 text-blue-800",
-    SELESAI: "bg-gray-100 text-gray-800",
-  };
-
-  const isFull = event.quota && event._count?.registrations >= event.quota;
-  const canRegister = event.registrationOpen && event.status !== "SELESAI" && !isFull && session?.user;
+  const status = STATUS_STYLE[event.status] ?? STATUS_STYLE.MENDATANG;
+  const attendeeCount = event._count?.registrations ?? 0;
+  const isFull = Boolean(event.quota) && attendeeCount >= (event.quota ?? 0);
+  const isPast = event.status === "SELESAI";
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href={session?.user ? "/discovery" : "/landing"} className="text-[#7960D7] hover:underline flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Kembali
-          </Link>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
 
-          <nav className="flex items-center gap-6">
-            <Link href={session?.user ? "/discovery" : "/landing"} className="text-gray-600 hover:text-gray-900">
-              Home
-            </Link>
-            <Link href="/komunitas" className="text-gray-600 hover:text-gray-900">
-              Community
-            </Link>
-            <Link href="/event" className="text-gray-600 hover:text-gray-900">
-              Event
-            </Link>
-          </nav>
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <Link
+          href="/event"
+          className="mb-6 inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Semua event
+        </Link>
 
-          {session?.user ? (
-            <Link href="/profile" className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
-              <span className="text-white font-semibold">
-                {session.user.name?.charAt(0).toUpperCase() || 'A'}
-              </span>
-            </Link>
-          ) : (
-            <Link href="/login" className="px-4 py-2 text-[#7960D7] hover:bg-[#7960D7] hover:bg-opacity-10 rounded-full font-medium transition-colors">
-              Log in
-            </Link>
-          )}
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg p-8 mb-6 border border-gray-200">
-          <div className="flex items-start justify-between mb-4">
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-8">
+          <div className="mb-4 flex items-start justify-between gap-4">
             <h1 className="text-3xl font-bold text-gray-900">{event.name}</h1>
-            <span className={`px-4 py-2 rounded-full text-sm font-medium ${statusBadge}`}>
-              {event.status}
+            <span className={`flex-shrink-0 rounded-full px-4 py-2 text-sm font-medium ${status.className}`}>
+              {status.label}
             </span>
           </div>
 
-          <p className="text-gray-600 mb-6">{event.description}</p>
+          <p className="mb-6 leading-relaxed text-gray-600">{event.description}</p>
 
-          <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+          <div className="mb-6 grid gap-4 text-sm sm:grid-cols-2">
             <div>
-              <p className="text-gray-500 mb-1">📅 Tanggal</p>
-              <p className="text-gray-900 font-medium">
+              <p className="mb-1 text-gray-500">Tanggal</p>
+              <p className="font-medium text-gray-900">
                 {new Date(event.startDate).toLocaleDateString("id-ID", {
+                  weekday: "long",
                   day: "numeric",
                   month: "long",
                   year: "numeric",
@@ -125,88 +140,74 @@ export default function EventDetailPage() {
               </p>
             </div>
             <div>
-              <p className="text-gray-500 mb-1">⏰ Waktu</p>
-              <p className="text-gray-900 font-medium">{event.startTime || "Waktu belum diumumkan"}</p>
+              <p className="mb-1 text-gray-500">Waktu</p>
+              <p className="font-medium text-gray-900">{event.startTime || "Belum diumumkan"}</p>
             </div>
             <div>
-              <p className="text-gray-500 mb-1">📍 Lokasi</p>
-              <p className="text-gray-900 font-medium">{event.venue || event.area || "Lokasi TBA"}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 mb-1">👥 Kuota</p>
-              <p className="text-gray-900 font-medium">
-                {event.quota ? `${event._count?.registrations || 0} / ${event.quota}` : "Tidak terbatas"}
+              <p className="mb-1 text-gray-500">Lokasi</p>
+              <p className="font-medium text-gray-900">
+                {event.venue || event.area?.replaceAll("_", " ") || "Belum diumumkan"}
               </p>
             </div>
             <div>
-              <p className="text-gray-500 mb-1">💰 Biaya</p>
-              <p className="text-gray-900 font-medium">{event.fee || "Gratis"}</p>
+              <p className="mb-1 text-gray-500">Peserta</p>
+              <p className="font-medium text-gray-900">
+                {event.quota ? `${attendeeCount} / ${event.quota}` : `${attendeeCount} terdaftar`}
+              </p>
             </div>
             <div>
-              <p className="text-gray-500 mb-1">📞 Kontak</p>
-              <p className="text-gray-900 font-medium">{event.contactInfo || event.organizer}</p>
+              <p className="mb-1 text-gray-500">Biaya</p>
+              <p className="font-medium text-gray-900">{event.fee || "Gratis"}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-gray-500">Penyelenggara</p>
+              <p className="font-medium text-gray-900">{event.organizer || "-"}</p>
             </div>
           </div>
 
-          {event.isRegistered ? (
-            <button className="w-full px-6 py-3 rounded-lg bg-gray-300 text-gray-900 font-medium cursor-not-allowed">
-              Sudah Terdaftar
-            </button>
-          ) : canRegister ? (
-            <button
-              onClick={() => alert("Fitur registrasi memerlukan login. Implementasi lengkap di route handler dengan auth.")}
-              className="w-full px-6 py-3 rounded-lg bg-gray-900 text-white font-medium hover:bg-gray-800 transition-colors"
-            >
-              Daftar Event
-            </button>
-          ) : isFull ? (
-            <button className="w-full px-6 py-3 rounded-lg bg-gray-300 text-gray-900 font-medium cursor-not-allowed">
-              Kuota Penuh
-            </button>
-          ) : !event.registrationOpen ? (
-            <button className="w-full px-6 py-3 rounded-lg bg-gray-300 text-gray-900 font-medium cursor-not-allowed">
-              Pendaftaran Ditutup
-            </button>
-          ) : !session?.user ? (
-            <Link
-              href="/login"
-              className="block w-full px-6 py-3 rounded-lg bg-gray-900 text-white font-medium text-center hover:bg-gray-800 transition-colors"
-            >
-              Log in untuk Daftar
-            </Link>
-          ) : (
-            <button className="w-full px-6 py-3 rounded-lg bg-gray-300 text-gray-900 font-medium cursor-not-allowed">
-              Event Selesai
-            </button>
-          )}
+          <RsvpButton
+            eventId={event.id}
+            isRegistered={Boolean(event.isRegistered)}
+            registrationOpen={event.registrationOpen}
+            isFull={isFull}
+            isPast={isPast}
+            isLoggedIn={isLoggedIn}
+          />
 
           {event.dataSource === "REFERENCE_UNVERIFIED" && (
-            <p className="mt-4 text-xs text-gray-500 text-center">
-              📌 Data referensi — belum diverifikasi
+            <p className="mt-4 text-center text-xs text-gray-500">
+              Data referensi — belum diverifikasi admin.
             </p>
           )}
 
           {event.externalLink && (
-            <p className="mt-4 text-sm text-center">
-              <a href={event.externalLink} target="_blank" rel="noopener noreferrer" className="text-[#7960D7] hover:underline">
+            <p className="mt-4 text-center text-sm">
+              <a
+                href={event.externalLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#7960D7] hover:underline"
+              >
                 Tautan sumber eksternal
               </a>
             </p>
           )}
         </div>
 
-        {event.relatedCommunities?.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="font-bold text-gray-900 mb-3">Komunitas Terkait</h2>
-            {event.relatedCommunities.map((rc: any) => (
-              <Link
-                key={rc.community.id}
-                href={`/komunitas/${rc.community.id}`}
-                className="block text-[#7960D7] hover:underline mb-2"
-              >
-                {rc.community.name}
-              </Link>
-            ))}
+        {event.relatedCommunities && event.relatedCommunities.length > 0 && (
+          <div className="rounded-xl border border-gray-200 bg-white p-6">
+            <h2 className="mb-3 font-bold text-gray-900">Komunitas terkait</h2>
+            <div className="space-y-2">
+              {event.relatedCommunities.map((community) => (
+                <Link
+                  key={community.id}
+                  href={`/komunitas/${community.id}`}
+                  className="block text-[#7960D7] hover:underline"
+                >
+                  {community.name}
+                </Link>
+              ))}
+            </div>
           </div>
         )}
       </main>

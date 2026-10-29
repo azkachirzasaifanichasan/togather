@@ -3,11 +3,11 @@ import Link from "next/link";
 interface Community {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   categories?: string[];
-  memberCount: number;
+  memberCount?: number | null;
   distance?: number;
-  area?: string;
+  area?: string | null;
   type?: string;
 }
 
@@ -58,7 +58,7 @@ export function CommunityList({ communities, title = "Community", showAll = fals
                   {community.description}
                 </p>
                 <div className="flex items-center gap-2 mt-2 text-xs text-[#6B7280]">
-                  <span>{community.memberCount} members</span>
+                  <span>{community.memberCount ?? 0} members</span>
                   {community.distance && (
                     <>
                       <span>•</span>

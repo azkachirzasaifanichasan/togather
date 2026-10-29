@@ -4,11 +4,21 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import Image from "next/image";
+
+import { Header } from "@/components/Header";
+
+interface SessionUser {
+  name?: string | null;
+  email?: string | null;
+}
+
+interface SessionData {
+  user?: SessionUser | null;
+}
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,41 +55,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/discovery" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#7960D7] rounded-lg flex items-center justify-center p-1">
-              <Image
-                src="/logo-togather.png"
-                alt="Togather"
-                width={24}
-                height={24}
-                className="object-contain"
-              />
-            </div>
-            <span className="text-xl font-bold text-gray-900">Togather</span>
-          </Link>
-
-          <nav className="flex items-center gap-8">
-            <Link href="/discovery" className="text-gray-600 hover:text-gray-900">
-              Home
-            </Link>
-            <Link href="/komunitas" className="text-gray-600 hover:text-gray-900">
-              Community
-            </Link>
-            <Link href="/event" className="text-gray-600 hover:text-gray-900">
-              Event
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-4">
-            <Link href="/profile" className="w-10 h-10 bg-[#7960D7] rounded-full flex items-center justify-center text-white font-bold hover:bg-[#6950c7] transition-colors">
-              {session?.user?.name?.charAt(0).toUpperCase() || 'A'}
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <main className="max-w-2xl mx-auto px-6 py-12">
         <div className="bg-white rounded-2xl shadow-sm p-8">
