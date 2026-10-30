@@ -25,7 +25,7 @@ export default async function LandingPage() {
               <p className="text-lg text-[#6B7280] leading-relaxed max-w-xl">
                 Whatever your interest, from hiking and reading to networking and skill sharing, 
                 there are thousands of people who share it on Togather. Events are happening every 
-                dayâ€”sign up to join the fun.
+                day sign up to join the fun.
               </p>
 
               <div className="flex flex-wrap gap-4">

@@ -171,7 +171,6 @@ export async function getDiscoveryCommunities(
       _count: {
         select: {
           members: true,
-          events: true,
         },
       },
     },
@@ -526,7 +525,6 @@ export async function getOrganizedCommunities(userId: string) {
       _count: {
         select: {
           members: true,
-          events: true,
         },
       },
     },

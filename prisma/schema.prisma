@@ -1,5 +1,3 @@
-// This is your Prisma schema file
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,6 +5,372 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String                   @id @default(cuid())
+  email                String                   @unique
+  passwordHash         String
+  isAdmin              Boolean                  @default(false)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  accounts             Account[]
+  joinRequests         CommunityJoinRequest[]
+  memberships          CommunityMembership[]
+  organizedCommunities CommunityOrganizer[]
+  posts                CommunityPost[]
+  submissions          CommunitySubmission[]
+  registrations        EventRegistration[]
+  actedNotifications   Notification[]           @relation("NotificationActor")
+  notifications        Notification[]           @relation("NotificationRecipient")
+  notificationPrefs    NotificationPreference[]
+  comments             PostComment[]
+  likes                PostLike[]
+  shares               PostShare[]
+  activities           UserActivityHistory[]
+  profile              UserProfile?
+}
+
+/// *
+///  * Links an external identity provider account (e.g. Google) to a Togather
+///  * user. One user may have several accounts (password + Google).
+///  *
+///  * `provider` + `providerAccountId` is the natural key of the external account.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model UserProfile {
+  id              String             @id @default(cuid())
+  userId          String             @unique
+  name            String?
+  phone           String?
+  phoneVerifiedAt DateTime?
+  domicile        Area?
+  interests       InterestCategory[]
+  bio             String?
+  address         String?
+  avatarUrl       String?
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model Community {
+  id                String                   @id @default(cuid())
+  name              String
+  description       String
+  type              CommunityType
+  accessType        CommunityAccessType
+  categories        InterestCategory[]
+  externalLinks     String[]
+  dataSource        DataSource               @default(DEMO)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  avatarUrl         String?
+  bannerUrl         String?
+  joinRequests      CommunityJoinRequest[]
+  location          CommunityLocation?
+  members           CommunityMembership[]
+  organizers        CommunityOrganizer[]
+  posts             CommunityPost[]
+  submission        CommunitySubmission?
+  events            EventCommunity[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+
+  @@index([type])
+  @@index([accessType])
+  @@index([categories])
+}
+
+model CommunityLocation {
+  id          String                    @id @default(cuid())
+  communityId String                    @unique
+  area        Area?
+  coordinates Unsupported("geography")?
+  addressText String?
+  isOnline    Boolean                   @default(false)
+  community   Community                 @relation(fields: [communityId], references: [id], onDelete: Cascade)
+}
+
+model CommunityOrganizer {
+  id          String    @id @default(cuid())
+  communityId String
+  userId      String
+  addedAt     DateTime  @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([userId])
+}
+
+model CommunityMembership {
+  id          String    @id @default(cuid())
+  communityId String
+  userId      String
+  joinedAt    DateTime  @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([userId])
+}
+
+model CommunityJoinRequest {
+  id          String           @id @default(cuid())
+  communityId String
+  userId      String
+  status      SubmissionStatus @default(PENDING)
+  requestedAt DateTime         @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  community   Community        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([userId])
+  @@index([status])
+}
+
+model CommunitySubmission {
+  id              String           @id @default(cuid())
+  communityId     String           @unique
+  userId          String
+  status          SubmissionStatus @default(PENDING)
+  submittedAt     DateTime         @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  rejectionReason String?
+  community       Community        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  submitter       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model Event {
+  id                 String                    @id @default(cuid())
+  name               String
+  description        String
+  category           InterestCategory
+  startDate          DateTime
+  endDate            DateTime?
+  startTime          String?
+  venue              String?
+  area               Area?
+  coordinates        Unsupported("geography")?
+  organizer          String
+  contactInfo        String?
+  quota              Int?
+  registrationOpen   Boolean                   @default(false)
+  fee                String?
+  externalLink       String?
+  dataSource         DataSource                @default(DEMO)
+  isPublished        Boolean                   @default(true)
+  createdBy          String?
+  publishedAt        DateTime?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  attendance         EventAttendance[]
+  relatedCommunities EventCommunity[]
+  registrations      EventRegistration[]
+
+  @@index([startDate])
+  @@index([category])
+  @@index([isPublished])
+  @@index([category], map: "idx_event_category")
+  @@index([isPublished], map: "idx_event_published")
+  @@index([startDate], map: "idx_event_start_date")
+}
+
+model EventCommunity {
+  id          String    @id @default(cuid())
+  eventId     String
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, communityId])
+  @@index([communityId])
+}
+
+model EventRegistration {
+  id           String           @id @default(cuid())
+  eventId      String
+  userId       String
+  registeredAt DateTime         @default(now())
+  cancelledAt  DateTime?
+  attendance   EventAttendance?
+  event        Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+}
+
+model EventAttendance {
+  id             String            @id @default(cuid())
+  registrationId String            @unique
+  attended       Boolean           @default(false)
+  markedAt       DateTime?
+  markedBy       String?
+  eventId        String?
+  event          Event?            @relation(fields: [eventId], references: [id])
+  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+}
+
+model UserActivityHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+/// *
+///  * A post inside a community.
+///  *
+///  * Only members may post, and only organizers may post in a PRIVATE
+///  * community (see `canPostInCommunity`).
+model CommunityPost {
+  id            String         @id @default(cuid())
+  communityId   String
+  authorId      String
+  content       String
+  createdAt     DateTime       @default(now())
+  media         Json?
+  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  community     Community      @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+  comments      PostComment[]
+  likes         PostLike[]
+  shares        PostShare[]
+
+  @@index([communityId, createdAt])
+  @@index([authorId])
+}
+
+model PostComment {
+  id            String         @id @default(cuid())
+  postId        String
+  authorId      String
+  content       String
+  createdAt     DateTime       @default(now())
+  parentId      String?
+  notifications Notification[]
+  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent        PostComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       PostComment[]  @relation("CommentReplies")
+  post          CommunityPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model PostLike {
+  postId    String
+  userId    String
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+/// *
+///  * A share is a counter, not a re-post: it records that a user shared the
+///  * post without duplicating the post into another community.
+model PostShare {
+  id        String        @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+}
+
+/// *
+///  * A notification delivered to one recipient.
+///  *
+///  * `personal` marks the POST_* types: they concern the recipient's own post
+///  * and survive a PERSONAL notification level. `mutedAt` is set when the
+///  * recipient mutes a single notification from the bell dropdown.
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  actorId     String?
+  communityId String
+  type        NotificationType
+  personal    Boolean          @default(false)
+  postId      String?
+  commentId   String?
+  message     String
+  readAt      DateTime?
+  mutedAt     DateTime?
+  createdAt   DateTime         @default(now())
+  actor       User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  comment     PostComment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  community   Community        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  post        CommunityPost?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+/// *
+///  * Per-user, per-community notification level.
+///  *
+///  * Missing row means ALL. The level decides which notifications are created
+///  * at all, so muting a community stops the noise rather than only hiding it.
+model NotificationPreference {
+  id          String            @id @default(cuid())
+  userId      String
+  communityId String
+  level       NotificationLevel @default(ALL)
+  community   Community         @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, communityId])
+  @@index([userId])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
 }
 
 enum DataSource {
@@ -43,29 +407,27 @@ enum InterestCategory {
   LAINNYA
 }
 
-/**
- * What a notification is about.
- *
- * `POST_*` are personal (they concern the recipient's own post) and are the
- * only types delivered when a community is set to PERSONAL. `COMMUNITY_*`
- * are community-wide and require ALL.
- */
+/// *
+///  * What a notification is about.
+///  *
+///  * `POST_*` are personal (they concern the recipient's own post) and are the
+///  * only types delivered when a community is set to PERSONAL. `COMMUNITY_*`
+///  * are community-wide and require ALL.
 enum NotificationType {
   POST_LIKE
   POST_COMMENT
-  POST_REPLY
   POST_SHARE
   COMMUNITY_POST
   COMMUNITY_COMMENT
+  POST_REPLY
 }
 
-/**
- * Per-community notification level.
- *
- * ALL      - every notification for the community
- * PERSONAL - only personal ones (like/comment/share on the recipient's post)
- * OFF      - nothing from the community
- */
+/// *
+///  * Per-community notification level.
+///  *
+///  * ALL      - every notification for the community
+///  * PERSONAL - only personal ones (like/comment/share on the recipient's post)
+///  * OFF      - nothing from the community
 enum NotificationLevel {
   ALL
   PERSONAL
@@ -78,387 +440,4 @@ enum Area {
   BANTUL
   KULON_PROGO
   GUNUNGKIDUL
-}
-
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  isAdmin      Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  profile              UserProfile?
-  accounts             Account[]
-  memberships          CommunityMembership[]
-  organizedCommunities CommunityOrganizer[]
-  joinRequests         CommunityJoinRequest[]
-  submissions          CommunitySubmission[]
-  registrations        EventRegistration[]
-  activities           UserActivityHistory[]
-  posts                CommunityPost[]
-  comments             PostComment[]
-  likes                PostLike[]
-  shares               PostShare[]
-  notifications        Notification[]           @relation("NotificationRecipient")
-  actedNotifications   Notification[]           @relation("NotificationActor")
-  notificationPrefs    NotificationPreference[]
-}
-
-/**
- * Links an external identity provider account (e.g. Google) to a Togather
- * user. One user may have several accounts (password + Google).
- *
- * `provider` + `providerAccountId` is the natural key of the external account.
- */
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-model UserProfile {
-  id              String             @id @default(cuid())
-  userId          String             @unique
-  name            String?
-  phone           String?
-  phoneVerifiedAt DateTime?
-  domicile        Area?
-  address         String?
-  avatarUrl       String?
-  interests       InterestCategory[]
-  bio             String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Community {
-  id            String              @id @default(cuid())
-  name          String
-  description   String
-  type          CommunityType
-  accessType    CommunityAccessType
-  categories    InterestCategory[]
-  externalLinks String[]
-  dataSource    DataSource          @default(DEMO)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-
-  // Community images
-  avatarUrl     String?
-  bannerUrl     String?
-
-  location     CommunityLocation?
-  organizers   CommunityOrganizer[]
-  members      CommunityMembership[]
-  joinRequests CommunityJoinRequest[]
-  submission   CommunitySubmission?
-  events       EventCommunity[]
-  posts        CommunityPost[]
-  notifications        Notification[]
-  notificationPrefs    NotificationPreference[]
-
-  @@index([type])
-  @@index([accessType])
-  @@index([categories])
-}
-
-model CommunityLocation {
-  id          String                                @id @default(cuid())
-  communityId String                                @unique
-  area        Area?
-  // PostGIS geography(Point,4326) stored as Unsupported, queried via raw SQL
-  coordinates Unsupported("geography(Point,4326)")?
-  addressText String? // General area description, never precise personal address
-  isOnline    Boolean                               @default(false)
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-}
-
-model CommunityOrganizer {
-  id          String   @id @default(cuid())
-  communityId String
-  userId      String
-  addedAt     DateTime @default(now())
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([communityId, userId])
-  @@index([userId])
-}
-
-model CommunityMembership {
-  id          String   @id @default(cuid())
-  communityId String
-  userId      String
-  joinedAt    DateTime @default(now())
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([communityId, userId])
-  @@index([userId])
-}
-
-model CommunityJoinRequest {
-  id          String           @id @default(cuid())
-  communityId String
-  userId      String
-  status      SubmissionStatus @default(PENDING)
-  requestedAt DateTime         @default(now())
-  reviewedAt  DateTime?
-  reviewedBy  String?
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([communityId, userId])
-  @@index([userId])
-  @@index([status])
-}
-
-model CommunitySubmission {
-  id              String           @id @default(cuid())
-  communityId     String           @unique
-  userId          String
-  status          SubmissionStatus @default(PENDING)
-  submittedAt     DateTime         @default(now())
-  reviewedAt      DateTime?
-  reviewedBy      String?
-  rejectionReason String?
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  submitter User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
-}
-
-model Event {
-  id               String                                @id @default(cuid())
-  name             String
-  description      String
-  category         InterestCategory
-  startDate        DateTime
-  endDate          DateTime?
-  startTime        String? // "14:00 WIB" or null if unannounced
-  venue            String?
-  area             Area?
-  coordinates      Unsupported("geography(Point,4326)")?
-  organizer        String // Organizer name or external account
-  contactInfo      String?
-  quota            Int?
-  registrationOpen Boolean                               @default(false)
-  fee              String? // "Gratis", "Rp 50.000", etc.
-  externalLink     String?
-  dataSource       DataSource                            @default(DEMO)
-  isPublished      Boolean                               @default(true)
-  createdBy        String? // userId of admin who created it
-  publishedAt      DateTime?
-  createdAt        DateTime                              @default(now())
-  updatedAt        DateTime                              @updatedAt
-
-  relatedCommunities EventCommunity[]
-  registrations      EventRegistration[]
-  attendance         EventAttendance[]
-
-  @@index([startDate])
-  @@index([category])
-  @@index([isPublished])
-}
-
-model EventCommunity {
-  id          String @id @default(cuid())
-  eventId     String
-  communityId String
-
-  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-
-  @@unique([eventId, communityId])
-  @@index([communityId])
-}
-
-model EventRegistration {
-  id           String    @id @default(cuid())
-  eventId      String
-  userId       String
-  registeredAt DateTime  @default(now())
-  cancelledAt  DateTime?
-
-  event      Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attendance EventAttendance?
-
-  @@unique([eventId, userId])
-  @@index([userId])
-}
-
-model EventAttendance {
-  id             String    @id @default(cuid())
-  registrationId String    @unique
-  attended       Boolean   @default(false)
-  markedAt       DateTime?
-  markedBy       String? // userId of admin
-
-  registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  event        Event?            @relation(fields: [eventId], references: [id])
-  eventId      String?
-}
-
-model UserActivityHistory {
-  id         String   @id @default(cuid())
-  userId     String
-  action     String // "view_community", "join_community", "register_event", "search"
-  targetType String? // "community", "event"
-  targetId   String?
-  metadata   Json? // Additional context
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-/**
- * A post inside a community.
- *
- * Only members may post, and only organizers may post in a PRIVATE
- * community (see `canPostInCommunity`).
- */
-model CommunityPost {
-  id          String   @id @default(cuid())
-  communityId String
-  authorId    String
-  content     String
-  // Attachments, stored as [{ url, type: "image" | "video", name }].
-  media       Json?
-  createdAt   DateTime @default(now())
-
-  community Community  @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  comments  PostComment[]
-  likes     PostLike[]
-  shares    PostShare[]
-  notifications Notification[]
-
-  @@index([communityId, createdAt])
-  @@index([authorId])
-}
-
-model PostComment {
-  id        String   @id @default(cuid())
-  postId    String
-  authorId  String
-  content   String
-  // Replies are one level deep: a reply's parent is always a top-level
-  // comment, never another reply (see `createComment`).
-  parentId  String?
-  createdAt DateTime @default(now())
-
-  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  parent   PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  PostComment[] @relation("CommentReplies")
-  notifications Notification[]
-
-  @@index([postId, createdAt])
-  @@index([authorId])
-  @@index([parentId])
-}
-
-model PostLike {
-  postId    String
-  userId    String
-  createdAt DateTime @default(now())
-
-  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([postId, userId])
-  @@index([userId])
-}
-
-/**
- * A share is a counter, not a re-post: it records that a user shared the
- * post without duplicating the post into another community.
- */
-model PostShare {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String
-  createdAt DateTime @default(now())
-
-  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([postId])
-  @@index([userId])
-}
-
-/**
- * A notification delivered to one recipient.
- *
- * `personal` marks the POST_* types: they concern the recipient's own post
- * and survive a PERSONAL notification level. `mutedAt` is set when the
- * recipient mutes a single notification from the bell dropdown.
- */
-model Notification {
-  id          String           @id @default(cuid())
-  userId      String
-  actorId     String?
-  communityId String
-  type        NotificationType
-  personal    Boolean          @default(false)
-  postId      String?
-  commentId   String?
-  message     String
-  readAt      DateTime?
-  mutedAt     DateTime?
-  createdAt   DateTime         @default(now())
-
-  user      User           @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
-  actor     User?          @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
-  community Community      @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  post      CommunityPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
-  comment   PostComment?   @relation(fields: [commentId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([userId, readAt])
-}
-
-/**
- * Per-user, per-community notification level.
- *
- * Missing row means ALL. The level decides which notifications are created
- * at all, so muting a community stops the noise rather than only hiding it.
- */
-model NotificationPreference {
-  id          String            @id @default(cuid())
-  userId      String
-  communityId String
-  level       NotificationLevel @default(ALL)
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, communityId])
-  @@index([userId])
 }

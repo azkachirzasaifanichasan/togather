@@ -86,7 +86,7 @@ export async function getAllCommunitiesForAdmin() {
           rejectionReason: true,
         },
       },
-      _count: { select: { members: true, organizers: true, events: true } },
+      _count: { select: { members: true, organizers: true } },
     },
     orderBy: { createdAt: "desc" },
   });

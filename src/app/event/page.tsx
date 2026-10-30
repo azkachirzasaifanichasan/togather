@@ -1,14 +1,14 @@
 import { auth } from "@/lib/auth";
-import { getUserEventRegistrations } from "@/server/events";
 import { getUpcomingEvents } from "@/server/events";
+import type { EventSummary } from "@/server/events";
 import Link from "next/link";
 
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { EventCard } from "@/components/events/EventCard";
 
 const TABS = [
-  { key: "going", label: "Akan datang" },
-  { key: "past", label: "Riwayat" },
+  { key: "all", label: "Semua Events" },
   { key: "saved", label: "Disimpan" },
 ] as const;
 
@@ -19,49 +19,36 @@ export default async function EventPage({
 }) {
   const session = await auth();
   const { tab } = await searchParams;
-  const activeTab = TABS.some((item) => item.key === tab) ? (tab as string) : "going";
+  const activeTab = TABS.some((item) => item.key === tab) ? (tab as string) : "all";
 
-  // Untuk user login: events yang mereka daftar
-  const goingRegistrations = session
-    ? await getUserEventRegistrations(session.user.id, "TERDAFTAR")
-    : [];
-  const pastRegistrations = session
-    ? await getUserEventRegistrations(session.user.id, "RIWAYAT")
-    : [];
-
-  const goingEvents = goingRegistrations.map((r) => r.event);
-  const pastEvents = pastRegistrations.map((r) => r.event);
-
-  // Untuk guest: upcoming events dari API
-  const upcomingEvents = session ? [] : await getUpcomingEvents();
+  // Ambil semua events untuk semua users
+  const allEvents = await getUpcomingEvents();
 
   // Tentukan events yang akan ditampilkan
-  let currentEvents = [];
-  let isGuestView = false;
+  let currentEvents: EventSummary[] = [];
   
-  if (!session) {
-    // Guest: tampilkan upcoming events
-    isGuestView = true;
-    currentEvents = upcomingEvents;
+  if (activeTab === "all") {
+    // Tab "Semua Events" - untuk semua users
+    currentEvents = allEvents;
   } else {
-    // User login: tampilkan sesuai tab
-    currentEvents = activeTab === "going" ? goingEvents : activeTab === "past" ? pastEvents : [];
+    // Tab "Disimpan" - belum tersedia
+    currentEvents = [];
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <Header />
 
-      <div className="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
+      <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-12">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold text-gray-900">
-              {session ? "Event kamu" : "Events"}
+              Events
             </h1>
             <p className="mt-2 text-gray-600">
-              {session
-                ? `${goingEvents.length} event akan datang · ${pastEvents.length} riwayat`
-                : `Temukan ${upcomingEvents.length} event di sekitar Anda`}
+              {activeTab === "all" 
+                ? `Temukan ${allEvents.length} event di sekitar Anda`
+                : "Bookmark event akan tersedia di fase berikutnya"}
             </p>
           </div>
           <Link
@@ -72,131 +59,158 @@ export default async function EventPage({
           </Link>
         </div>
 
-        {/* Tabs hanya untuk user login */}
-        {session && (
-          <div className="mb-8 flex items-center gap-2 border-b border-gray-200">
-            {TABS.map((item) => (
-              <Link
-                key={item.key}
-                href={`/event?tab=${item.key}`}
-                className={`-mb-px rounded-t-lg px-5 py-3 text-sm font-semibold transition-colors ${
-                  activeTab === item.key
-                    ? "bg-[#7960D7] text-white"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        )}
+        {/* Tabs untuk semua user */}
+        <div className="mb-8 flex items-center gap-2 border-b border-gray-200">
+          {TABS.map((item) => (
+            <Link
+              key={item.key}
+              href={`/event?tab=${item.key}`}
+              className={`-mb-px rounded-t-lg px-5 py-3 text-sm font-semibold transition-colors ${
+                activeTab === item.key
+                  ? "bg-[#7960D7] text-white"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
 
-        {isGuestView ? (
-          // Guest view: tampilkan upcoming events
+        {activeTab === "all" ? (
+          // Tab "Semua Events"
           currentEvents.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-200 py-16 text-center">
-              <h2 className="mb-2 text-2xl font-bold text-gray-900">Belum ada event</h2>
-              <p className="mx-auto mb-6 max-w-md text-gray-600">
-                Saat ini belum ada event yang akan datang. Coba lagi nanti.
+            <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
+                <svg className="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="mb-2 text-xl font-bold text-gray-900">Belum ada events saat ini</h3>
+              <p className="mb-6 text-gray-600 max-w-md mx-auto">
+                Events akan muncul di sini saat komunitas mulai mengadakan acara. Coba lagi nanti atau jelajahi komunitas terlebih dahulu.
               </p>
-              <Link
-                href="/discovery"
-                className="inline-block rounded-lg bg-gray-900 px-6 py-3 font-semibold text-white transition-colors hover:bg-gray-800"
-              >
-                Jelajahi event
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link href="/discovery" className="rounded-lg bg-[#7960D7] px-6 py-3 text-sm font-semibold text-white hover:bg-[#6950c7]">
+                  Explore Communities
+                </Link>
+                <button className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  Refresh
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              {currentEvents.map((event) => {
-                const eventDate = new Date(event.startDate);
-                const day = eventDate.getDate();
-                const month = eventDate
-                  .toLocaleString("id-ID", { month: "short" })
-                  .toUpperCase();
+            <div className="space-y-10">
+              {/* Stats Bar */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
+                  <div className="text-xl font-bold text-[#7960D7]">{currentEvents.length}</div>
+                  <div className="text-xs text-gray-600">Total Events</div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
+                  <div className="text-xl font-bold text-green-600">
+                    {currentEvents.filter(e => e.quota || e.fee).length}
+                  </div>
+                  <div className="text-xs text-gray-600">Interactive</div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
+                  <div className="text-xl font-bold text-blue-600">
+                    {currentEvents.filter(e => !e.quota && !e.fee).length}
+                  </div>
+                  <div className="text-xs text-gray-600">Informational</div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
+                  <div className="text-xl font-bold text-orange-600">
+                    {currentEvents.filter(e => !e.fee || e.fee === "Gratis").length}
+                  </div>
+                  <div className="text-xs text-gray-600">Free Events</div>
+                </div>
+              </div>
 
-                return (
-                  <Link key={event.id} href={`/event/${event.id}`} className="group block">
-                    <div className="flex gap-5 rounded-xl border border-gray-200 p-5 transition-shadow hover:shadow-lg">
-                      <div className="flex h-20 w-20 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-[#7960D7]">
-                        <span className="text-2xl font-bold text-white">{day}</span>
-                        <span className="text-xs text-purple-100">{month}</span>
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h3 className="mb-1 text-lg font-bold text-gray-900 transition-colors group-hover:text-[#7960D7]">
-                          {event.name}
-                        </h3>
-                        <p className="mb-2 line-clamp-2 text-sm text-gray-600">{event.description}</p>
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                          <span>{event.startTime || "Waktu TBA"}</span>
-                          <span>{event.venue || event.area?.replaceAll("_", " ") || "Lokasi TBA"}</span>
-                          {event.relatedCommunities[0] && (
-                            <span>{event.relatedCommunities[0].name}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+              {/* Interactive Events Section */}
+              <div>
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Interactive Events</h3>
+                    <p className="text-sm text-gray-600">Events dengan tiket, kuota, dan sistem pendaftaran</p>
+                  </div>
+                  <Link href="/event?type=interactive" className="text-sm font-medium text-[#7960D7] hover:text-[#6950c7]">
+                    Lihat semua →
                   </Link>
-                );
-              })}
+                </div>
+                
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {currentEvents
+                    .filter(event => event.quota || event.fee)
+                    .slice(0, 6)
+                    .map((event) => (
+                      <EventCard 
+                        key={event.id} 
+                        event={event} 
+                        type="INTERACTIVE"
+                        showPreview={true}
+                      />
+                    ))}
+                </div>
+                
+                {currentEvents.filter(event => event.quota || event.fee).length === 0 && (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-gray-600">Belum ada interactive events saat ini</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Informational Events Section */}
+              <div>
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Info & Workshop</h3>
+                    <p className="text-sm text-gray-600">Seminar, workshop, dan event informasi lainnya</p>
+                  </div>
+                  <Link href="/event?type=informational" className="text-sm font-medium text-[#7960D7] hover:text-[#6950c7]">
+                    Lihat semua →
+                  </Link>
+                </div>
+                
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
+                  {currentEvents
+                    .filter(event => !event.quota && !event.fee)
+                    .slice(0, 5)
+                    .map((event) => (
+                      <EventCard 
+                        key={event.id} 
+                        event={event} 
+                        type="INFORMATIONAL"
+                        showPreview={true}
+                      />
+                    ))}
+                </div>
+                
+                {currentEvents.filter(event => !event.quota && !event.fee).length === 0 && (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-gray-600">Belum ada informational events saat ini</p>
+                  </div>
+                )}
+              </div>
             </div>
           )
-        ) : currentEvents.length === 0 ? (
+        ) : (
+          // Tab "Disimpan" - placeholder
           <div className="rounded-xl border border-dashed border-gray-200 py-16 text-center">
-            <h2 className="mb-2 text-2xl font-bold text-gray-900">
-              {activeTab === "saved"
-                ? "Fitur simpan belum tersedia"
-                : activeTab === "past"
-                  ? "Belum ada riwayat event"
-                  : "Belum ada rencana"}
-            </h2>
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[#7960D7]/10">
+              <svg className="h-8 w-8 text-[#7960D7]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+            </div>
+            <h2 className="mb-2 text-2xl font-bold text-gray-900">Fitur Disimpan Segera Hadir</h2>
             <p className="mx-auto mb-6 max-w-md text-gray-600">
-              {activeTab === "saved"
-                ? "Bookmark event akan hadir di pembaruan berikutnya. Sementara itu, jelajahi event lewat peta."
-                : "Temukan event yang menarik dan daftar dalam satu klik."}
+              Bookmark event favorit Anda akan tersedia di fase pengembangan berikutnya.
             </p>
             <Link
-              href="/discovery"
-              className="inline-block rounded-lg bg-gray-900 px-6 py-3 font-semibold text-white transition-colors hover:bg-gray-800"
+              href="/event?tab=all"
+              className="inline-block rounded-lg bg-[#7960D7] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#6950c7]"
             >
-              Jelajahi event
+              Lihat Semua Events
             </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {currentEvents.map((event) => {
-              const eventDate = new Date(event.startDate);
-              const day = eventDate.getDate();
-              const month = eventDate
-                .toLocaleString("id-ID", { month: "short" })
-                .toUpperCase();
-
-              return (
-                <Link key={event.id} href={`/event/${event.id}`} className="group block">
-                  <div className="flex gap-5 rounded-xl border border-gray-200 p-5 transition-shadow hover:shadow-lg">
-                    <div className="flex h-20 w-20 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-[#7960D7]">
-                      <span className="text-2xl font-bold text-white">{day}</span>
-                      <span className="text-xs text-purple-100">{month}</span>
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <h3 className="mb-1 text-lg font-bold text-gray-900 transition-colors group-hover:text-[#7960D7]">
-                        {event.name}
-                      </h3>
-                      <p className="mb-2 line-clamp-2 text-sm text-gray-600">{event.description}</p>
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                        <span>{event.startTime || "Waktu TBA"}</span>
-                        <span>{event.venue || event.area?.replaceAll("_", " ") || "Lokasi TBA"}</span>
-                        {event.relatedCommunities[0] && (
-                          <span>{event.relatedCommunities[0].name}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
           </div>
         )}
       </div>
