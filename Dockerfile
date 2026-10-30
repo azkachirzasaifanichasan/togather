@@ -27,6 +27,13 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# The standalone bundle ships runtime dependencies only, so the Prisma CLI —
+# which docker-compose's start command runs via `prisma migrate deploy` — is
+# missing. Install it globally: that keeps its ~30 transitive packages out of
+# `./node_modules`, where they would overwrite the generated client that
+# `next build` already bundled there.
+RUN npm install -g prisma@6.19.3
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 

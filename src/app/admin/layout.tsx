@@ -6,6 +6,10 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
+// The admin area is per-user and reads the database, so it must never be
+// prerendered: `next build` runs without a database in CI/Docker.
+export const dynamic = "force-dynamic";
+
 /**
  * Admin-only area. The guard lives here, so every nested page inherits it.
  *

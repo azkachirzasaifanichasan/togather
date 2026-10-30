@@ -33,7 +33,7 @@ services:
       db:
         condition: service_healthy
     command: >
-      sh -c "npx prisma migrate deploy && npm run start"
+      sh -c "prisma migrate deploy && node server.js"
 
 volumes:
   togather_postgres_data:
