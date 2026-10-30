@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Area, InterestCategory } from "@prisma/client";
+import { CommunityImageUpload } from "@/components/communities/CommunityImageUpload";
 
 const AREA_LABELS: Record<Area, string> = {
   KOTA_YOGYAKARTA: "Kota Yogyakarta",
@@ -38,6 +39,8 @@ type CommunityInitial = {
   categories: InterestCategory[];
   area: Area | null;
   addressText: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
 };
 
 /**
@@ -66,6 +69,8 @@ export function CreateCommunityForm({
   const [categories, setCategories] = useState<InterestCategory[]>(
     community?.categories ?? []
   );
+  const [avatarUrl, setAvatarUrl] = useState(community?.avatarUrl ?? "");
+  const [bannerUrl, setBannerUrl] = useState(community?.bannerUrl ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<{
@@ -101,6 +106,8 @@ export function CreateCommunityForm({
         categories,
         area: type === "OFFLINE" ? area : null,
         addressText: type === "OFFLINE" ? addressText.trim() || null : null,
+        avatarUrl: avatarUrl || null,
+        bannerUrl: bannerUrl || null,
       };
 
       if (isEdit) {
@@ -177,8 +184,6 @@ export function CreateCommunityForm({
     );
   }
 
-  const initial = name.trim().charAt(0).toUpperCase() || "K";
-
   return (
     <form
       onSubmit={submit}
@@ -190,11 +195,16 @@ export function CreateCommunityForm({
         </div>
       )}
 
-      {/* Name + avatar preview, like Facebook's create-group dialog */}
-      <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-[#7960D7] text-2xl font-bold text-white">
-          {initial}
-        </div>
+      {/* Name + avatar upload */}
+      <div className="flex items-start gap-4">
+        <CommunityImageUpload
+          type="avatar"
+          value={avatarUrl}
+          onChange={setAvatarUrl}
+          onRemove={() => setAvatarUrl("")}
+          initials={name}
+          disabled={pending}
+        />
         <div className="min-w-0 flex-1">
           <label htmlFor="name" className="mb-2 block text-sm font-medium text-[#1F2937]">
             Nama komunitas
@@ -210,6 +220,21 @@ export function CreateCommunityForm({
             className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#7960D7]"
           />
         </div>
+      </div>
+
+      {/* Banner upload */}
+      <div>
+        <label className="mb-2 block text-sm font-medium text-[#1F2937]">
+          Banner komunitas <span className="font-normal text-gray-400">(opsional)</span>
+        </label>
+        <CommunityImageUpload
+          type="banner"
+          value={bannerUrl}
+          onChange={setBannerUrl}
+          onRemove={() => setBannerUrl("")}
+          initials={name}
+          disabled={pending}
+        />
       </div>
 
       <fieldset>

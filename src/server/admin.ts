@@ -120,6 +120,8 @@ export async function updateCommunityAsAdmin(
         ...(data.type !== undefined && { type: data.type }),
         ...(data.accessType !== undefined && { accessType: data.accessType }),
         ...(data.categories !== undefined && { categories: data.categories }),
+        ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
+        ...(data.bannerUrl !== undefined && { bannerUrl: data.bannerUrl }),
       },
     });
 

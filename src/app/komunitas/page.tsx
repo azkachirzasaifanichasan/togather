@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { getDiscoveryCommunities, getUserCommunities } from "@/server/communities";
 import Link from "next/link";
+import Image from "next/image";
+import { getCommunityThumbnail } from "@/lib/community-images";
 
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -9,6 +11,8 @@ type MyCommunity = {
   id: string;
   name: string;
   memberCount: number;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
 };
 
 function MyCommunityList({ communities }: { communities: MyCommunity[] }) {
@@ -20,10 +24,20 @@ function MyCommunityList({ communities }: { communities: MyCommunity[] }) {
           href={`/komunitas/${community.id}`}
           className="group flex items-center gap-3 rounded-lg p-2 hover:bg-gray-100"
         >
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-200">
-            <span className="font-semibold text-gray-700">
-              {community.name.charAt(0)}
-            </span>
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 overflow-hidden">
+            {community.avatarUrl ? (
+              <Image
+                src={community.avatarUrl}
+                alt=""
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="font-semibold text-gray-700">
+                {community.name.charAt(0)}
+              </span>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-gray-900">
@@ -188,49 +202,80 @@ export default async function KomunitasPage({
           )}
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {allCommunities.map((community) => (
-              <Link key={community.id} href={`/komunitas/${community.id}`} className="group block">
-                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-lg">
-                  <div className="relative h-32 bg-gradient-to-br from-purple-400 to-purple-600">
-                    <div className="absolute inset-0 bg-black/20" />
-                    <div className="absolute bottom-4 left-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white">
-                        <span className="text-xl font-bold text-[#7960D7]">
-                          {community.name.charAt(0)}
-                        </span>
+            {allCommunities.map((community) => {
+              const thumbnailUrl = getCommunityThumbnail(community);
+              return (
+                <Link key={community.id} href={`/komunitas/${community.id}`} className="group block">
+                  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-lg">
+                    <div className="relative h-32 overflow-hidden">
+                      {thumbnailUrl.startsWith("/uploads/") ? (
+                        // Local uploaded image - use next/image
+                        <Image
+                          src={thumbnailUrl}
+                          alt={community.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        // External image (Unsplash) - use regular img for better performance
+                        <img
+                          src={thumbnailUrl}
+                          alt={community.name}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                      <div className="absolute bottom-4 left-4">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white overflow-hidden ring-2 ring-white">
+                          {community.avatarUrl ? (
+                            <Image
+                              src={community.avatarUrl}
+                              alt=""
+                              width={56}
+                              height={56}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xl font-bold text-[#7960D7]">
+                              {community.name.charAt(0)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="p-4">
-                    <h3 className="mb-2 text-lg font-bold text-gray-900 transition-colors group-hover:text-[#7960D7]">
-                      {community.name}
-                    </h3>
-                    <p className="mb-4 line-clamp-2 text-sm text-gray-600">{community.description}</p>
+                    <div className="p-4">
+                      <h3 className="mb-2 text-lg font-bold text-gray-900 transition-colors group-hover:text-[#7960D7]">
+                        {community.name}
+                      </h3>
+                      <p className="mb-4 line-clamp-2 text-sm text-gray-600">{community.description}</p>
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-sm text-gray-500">
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                        </svg>
-                        <span>{community.memberCount} anggota</span>
-                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                          </svg>
+                          <span>{community.memberCount} anggota</span>
+                        </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
-                          {community.type === "ONLINE" ? "Online" : "Offline"}
-                        </span>
-                        {memberIds.has(community.id) && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#7960D7]/10 px-2 py-1 text-xs font-semibold text-[#7960D7]">
-                            Diikuti
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                            {community.type === "ONLINE" ? "Online" : "Offline"}
                           </span>
-                        )}
+                          {memberIds.has(community.id) && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#7960D7]/10 px-2 py-1 text-xs font-semibold text-[#7960D7]">
+                              Diikuti
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
 
           {allCommunities.length === 0 && (

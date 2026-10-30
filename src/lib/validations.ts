@@ -72,6 +72,9 @@ export const createCommunitySchema = z.object({
       lng: z.number().min(-180).max(180),
     })
     .nullish(),
+  // Community images (optional, set after upload)
+  avatarUrl: z.string().url("URL avatar tidak valid").nullish(),
+  bannerUrl: z.string().url("URL banner tidak valid").nullish(),
 });
 
 /**
@@ -87,6 +90,8 @@ export const updateCommunitySchema = createCommunitySchema
     categories: true,
     area: true,
     addressText: true,
+    avatarUrl: true,
+    bannerUrl: true,
   })
   .partial();
 

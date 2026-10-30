@@ -41,6 +41,8 @@ export default async function AdminEditCommunityPage({
           categories: community.categories,
           area: community.location?.area ?? null,
           addressText: community.location?.addressText ?? null,
+          avatarUrl: community.avatarUrl ?? null,
+          bannerUrl: community.bannerUrl ?? null,
         }}
       />
     </div>

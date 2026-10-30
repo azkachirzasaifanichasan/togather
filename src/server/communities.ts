@@ -29,6 +29,9 @@ export type CommunitySummary = {
   longitude: number | null;
   memberCount: number;
   distance?: number;
+  // Community images
+  avatarUrl: string | null;
+  bannerUrl: string | null;
 };
 
 /**
@@ -91,7 +94,7 @@ async function loadCommunityCoordinates(
  * Convert a community row into its public summary.
  */
 function toCommunitySummary(
-  community: CommunityRow,
+  community: CommunityRow & { avatarUrl?: string | null; bannerUrl?: string | null },
   distance?: number
 ): CommunitySummary {
   return {
@@ -108,6 +111,8 @@ function toCommunitySummary(
     latitude: community.latitude,
     longitude: community.longitude,
     memberCount: community._count.members,
+    avatarUrl: community.avatarUrl ?? null,
+    bannerUrl: community.bannerUrl ?? null,
     ...(distance !== undefined && { distance }),
   };
 }
@@ -299,6 +304,8 @@ export async function getCommunityProfileById(
     longitude: coord?.longitude ?? null,
     memberCount: community._count.members,
     isMember,
+    avatarUrl: community.avatarUrl ?? null,
+    bannerUrl: community.bannerUrl ?? null,
     hosts: community.organizers.map((o) => ({
       id: o.user.id,
       name: o.user.profile?.name ?? null,
@@ -430,6 +437,8 @@ export async function getPublicCommunityById(
     memberCount: community._count.members,
     isMember,
     joinRequestStatus,
+    avatarUrl: community.avatarUrl ?? null,
+    bannerUrl: community.bannerUrl ?? null,
   };
 }
 
@@ -451,6 +460,8 @@ export async function submitCommunity(
         accessType: data.accessType,
         categories: data.categories,
         externalLinks: data.externalLinks || [],
+        avatarUrl: data.avatarUrl ?? null,
+        bannerUrl: data.bannerUrl ?? null,
         location:
           data.type === "OFFLINE"
             ? {
@@ -574,6 +585,8 @@ export async function getUserCommunities(userId: string) {
       memberCount: m.community._count.members,
       joinedAt: m.joinedAt,
       isOrganizer: organizedIds.has(m.community.id),
+      avatarUrl: m.community.avatarUrl ?? null,
+      bannerUrl: m.community.bannerUrl ?? null,
     };
   });
 }

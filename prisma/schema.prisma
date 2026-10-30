@@ -158,6 +158,10 @@ model Community {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
+  // Community images
+  avatarUrl     String?
+  bannerUrl     String?
+
   location     CommunityLocation?
   organizers   CommunityOrganizer[]
   members      CommunityMembership[]

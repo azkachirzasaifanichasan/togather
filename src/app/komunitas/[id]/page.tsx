@@ -5,6 +5,7 @@ import { getCommunityPosts, canPostInCommunity } from "@/server/posts";
 import { getNotificationLevel } from "@/server/notifications";
 import Link from "next/link";
 import Image from "next/image";
+import { getCommunityThumbnail, getCommunityAvatar } from "@/lib/community-images";
 
 import { Header } from "@/components/Header";
 import { JoinButton } from "@/components/communities/JoinButton";
@@ -33,6 +34,10 @@ export default async function CommunityProfilePage({
   const admin = community.hosts[0];
   const isMember = community.isMember;
   const isOrganizer = community.hosts.length > 0;
+
+  // Get thumbnail and avatar with fallbacks
+  const bannerUrl = getCommunityThumbnail(community);
+  const avatarUrl = getCommunityAvatar(community);
 
   // Members and organizers see the feed; in a private community nobody else
   // may read the posts.
@@ -63,15 +68,40 @@ export default async function CommunityProfilePage({
           </Link>
 
           {/* Community header image */}
-          <div className="relative h-64 overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 mb-8">
-            <div className="absolute inset-0 bg-black/20" />
-            <Image
-              src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80"
-              alt={community.name}
-              fill
-              sizes="(max-width: 768px) 100vw, 1280px"
-              className="object-cover"
-            />
+          <div className="relative h-64 overflow-hidden rounded-2xl mb-8">
+            {bannerUrl.startsWith("/uploads/") ? (
+              <Image
+                src={bannerUrl}
+                alt={community.name}
+                fill
+                sizes="(max-width: 768px) 100vw, 1280px"
+                className="object-cover"
+              />
+            ) : (
+              <img
+                src={bannerUrl}
+                alt={community.name}
+                className="w-full h-full object-cover"
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+            <div className="absolute bottom-6 left-6">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white overflow-hidden ring-4 ring-white">
+                {avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt=""
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-3xl font-bold text-[#7960D7]">
+                    {community.name.charAt(0)}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Community info */}
