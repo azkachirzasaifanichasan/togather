@@ -65,10 +65,11 @@ export async function requireUser() {
 
 /**
  * Require user to have verified profile. Throws 403 if not.
+ * Admin is exempt: the profile gate applies to regular users only.
  */
 export async function requireVerified() {
   const ctx = await requireUser();
-  if (ctx.status !== "VERIFIED") {
+  if (ctx.status !== "VERIFIED" && !ctx.isAdmin) {
     throw new Error("PROFILE_NOT_VERIFIED");
   }
   return ctx;

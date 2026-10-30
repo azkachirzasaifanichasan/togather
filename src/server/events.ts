@@ -725,13 +725,9 @@ export async function getUpcomingEvents(): Promise<EventSummary[]> {
 
   return events.map((event) => {
     const coord = coordinates.get(event.id);
-    // Transform relatedCommunities untuk match format EventSummary
-    const transformedEvent = {
-      ...event,
-      relatedCommunities: event.relatedCommunities.map(rc => rc.community),
-    };
+    // Ambil relasi pivot apa adanya: `toEventSummary` membaca `rc.community`.
     return toEventSummary({
-      ...transformedEvent,
+      ...event,
       latitude: coord?.latitude ?? null,
       longitude: coord?.longitude ?? null,
     } as EventRow);

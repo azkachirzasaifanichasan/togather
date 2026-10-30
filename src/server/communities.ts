@@ -252,8 +252,8 @@ export async function getDiscoveryCommunities(
  * Server-side view of a community profile page.
  *
  * The public DTO (`getPublicCommunityById`) is what the API exposes; a
- * server-rendered page may also show the hosts and the upcoming events, so
- * this adds exactly those two and nothing more.
+ * server-rendered page may also show the hosts, so this adds exactly that
+ * and nothing more.
  */
 export async function getCommunityProfileById(
   communityId: string,
@@ -269,9 +269,6 @@ export async function getCommunityProfileById(
           user: { select: { id: true, profile: { select: { name: true } } } },
         },
       },
-      events: {
-        include: { event: true },
-      },
       _count: { select: { members: true } },
     },
   });
@@ -285,19 +282,6 @@ export async function getCommunityProfileById(
         where: { communityId, userId },
       })) > 0
     : false;
-
-  const now = new Date();
-  const upcomingEvents = community.events
-    .map((ec) => ec.event)
-    .filter((e) => e.isPublished && e.startDate >= now)
-    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
-    .map((e) => ({
-      id: e.id,
-      name: e.name,
-      startDate: e.startDate,
-      startTime: e.startTime,
-      venue: e.venue,
-    }));
 
   const coordinates = await loadCommunityCoordinates([community.id]);
   const coord = coordinates.get(community.id);
@@ -319,7 +303,6 @@ export async function getCommunityProfileById(
       id: o.user.id,
       name: o.user.profile?.name ?? null,
     })),
-    upcomingEvents,
   };
 }
 

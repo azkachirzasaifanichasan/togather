@@ -64,6 +64,12 @@ async function main() {
   await prisma.event.deleteMany();
   await prisma.communityJoinRequest.deleteMany();
   await prisma.communitySubmission.deleteMany();
+  await prisma.notificationPreference.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.postShare.deleteMany();
+  await prisma.postLike.deleteMany();
+  await prisma.postComment.deleteMany();
+  await prisma.communityPost.deleteMany();
   await prisma.communityMembership.deleteMany();
   await prisma.communityOrganizer.deleteMany();
   await prisma.communityLocation.deleteMany();
@@ -134,7 +140,45 @@ async function main() {
     },
   });
 
-  console.log("âœ… Created 3 accounts");
+  // Two more members so the post feed has a real conversation instead of
+  // one person talking to themselves.
+  const sinta = await prisma.user.create({
+    data: {
+      email: "sinta@togather.demo",
+      passwordHash,
+      profile: {
+        create: {
+          name: "Sinta Larasati",
+          phone: "+6281234567894",
+          phoneVerifiedAt: new Date(),
+          domicile: Area.KOTA_YOGYAKARTA,
+          address: "Jl. Malioboro No. 45, Kota Yogyakarta",
+          interests: [InterestCategory.SENI_DAN_HIBURAN, InterestCategory.OLAHRAGA],
+          bio: "Anut aktif di komunitas, suka foto dan lari.",
+        },
+      },
+    },
+  });
+
+  const bayu = await prisma.user.create({
+    data: {
+      email: "bayu@togather.demo",
+      passwordHash,
+      profile: {
+        create: {
+          name: "Bayu Pratama",
+          phone: "+6281234567895",
+          phoneVerifiedAt: new Date(),
+          domicile: Area.BANTUL,
+          address: "Jl. Imogiri No. 12, Bantul",
+          interests: [InterestCategory.TEKNOLOGI, InterestCategory.HOBI],
+          bio: "Suka ngoprek dan berbagi ide ringan.",
+        },
+      },
+    },
+  });
+
+  console.log("âœ… Created 5 accounts");
   console.log(`   Admin:    ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
   console.log(`   Operator: operator@togather.demo / ${SEED_PASSWORD}`);
   console.log(`   User:     user@togather.demo / ${SEED_PASSWORD}`);
@@ -188,6 +232,24 @@ async function main() {
     `âœ… Created demo activity: ${activity.activeRegistrations} active registration(s), ` +
       `${activity.pastRegistrations} past registration(s), ${activity.attendance} attendance, ` +
       `${activity.joinRequests} pending join request(s)`
+  );
+
+  // Create the post feed and the notifications that go with it, so the bell
+  // dropdown and the community feed have content to show.
+  const social = await createDemoPosts({
+    communities: demoCommunities,
+    operatorId: operator.id,
+    adminId: admin.id,
+    userId: user.id,
+    sintaId: sinta.id,
+    bayuId: bayu.id,
+  });
+
+  console.log(
+    `âœ… Created demo social: ${social.memberships} membership(s), ` +
+      `${social.posts} post(s), ${social.comments} comment(s), ` +
+      `${social.likes} like(s), ${social.shares} share(s), ` +
+      `${social.notifications} notification(s)`
   );
 
   console.log("ðŸŽ‰ Seed completed successfully!");
@@ -702,6 +764,354 @@ async function createDemoActivity({
     attendance,
     joinRequests,
   };
+}
+
+/**
+ * Create the demo social layer: memberships, posts, comments, likes,
+ * shares and the notifications they produce.
+ *
+ * The point is that the bell dropdown and the post feed are not empty on a
+ * fresh seed: the plain demo user has posts of their own that received
+ * likes and comments, plus community activity from the other members.
+ */
+async function createDemoPosts({
+  communities,
+  operatorId,
+  adminId,
+  userId,
+  sintaId,
+  bayuId,
+}: {
+  communities: Array<{ id: string; name: string }>;
+  operatorId: string;
+  adminId: string;
+  userId: string;
+  sintaId: string;
+  bayuId: string;
+}) {
+  const communityByName = new Map(communities.map((c) => [c.name, c.id]));
+  const techCommunityId = communityByName.get("DIY Tech Community");
+  const runnersCommunityId = communityByName.get("Jogja Runners Club");
+
+  let memberships = 0;
+  let posts = 0;
+  let comments = 0;
+  let likes = 0;
+  let shares = 0;
+  let notifications = 0;
+
+  // Everyone joins the two demo communities so they can post and receive
+  // notifications. The organizer is already a member of every community.
+  const members = [operatorId, adminId, userId, sintaId, bayuId];
+
+  for (const communityId of [techCommunityId, runnersCommunityId]) {
+    if (!communityId) continue;
+
+    for (const memberId of members) {
+      const existing = await prisma.communityMembership.findUnique({
+        where: { communityId_userId: { communityId, userId: memberId } },
+      });
+      if (existing) continue;
+
+      await prisma.communityMembership.create({
+        data: { communityId, userId: memberId },
+      });
+      memberships++;
+    }
+  }
+
+  if (!techCommunityId) {
+    return { memberships, posts, comments, likes, shares, notifications };
+  }
+
+  // 1. A post by the plain demo user, so they have a "my posts" view.
+  const userPost = await prisma.communityPost.create({
+    data: {
+      communityId: techCommunityId,
+      authorId: userId,
+      content:
+        "Halo semua! Baru gabung komunitas ini. Ada yang mau berbagi tips belajar frontend weekend?",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 30),
+    },
+  });
+  posts++;
+
+  // 2. A post by another member, so the feed has more than one thread.
+  const sintaPost = await prisma.communityPost.create({
+    data: {
+      communityId: techCommunityId,
+      authorId: sintaId,
+      content:
+        "Minggu depan ada meetup kecil di Pakem. Kita bahas AI tools buat produktivitas. Yang mau ikut comment ya!",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
+    },
+  });
+  posts++;
+
+  const bayuPost = await prisma.communityPost.create({
+    data: {
+      communityId: techCommunityId,
+      authorId: bayuId,
+      content:
+        "Baru bikin website portfolio pakai Next.js. Kirim feedback ya, terutama dari yang pernah deploy.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 90),
+    },
+  });
+  posts++;
+
+  // 4. An organizer announcement with a photo. Organizer posts get a
+  // freshness boost in the feed, so this stays near the top for a day.
+  await prisma.communityPost.create({
+    data: {
+      communityId: techCommunityId,
+      authorId: operatorId,
+      content:
+        "Open recruitment volunteer untuk meetup bulan depan! Yang tertarik bantu jadi moderator atau dokumentasi, komen di bawah ya.",
+      media: [
+        {
+          url: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&q=80",
+          type: "image",
+          name: "meetup.jpg",
+        },
+      ],
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 20),
+    },
+  });
+  posts++;
+
+  // Comments on the demo user's post: one personal, one from the community.
+  const comment1 = await prisma.postComment.create({
+    data: {
+      postId: userPost.id,
+      authorId: sintaId,
+      content: "Selamat datang! Saya juga belajar, tapi belum sampai jauh nih.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 28),
+    },
+  });
+  comments++;
+
+  const comment2 = await prisma.postComment.create({
+    data: {
+      postId: userPost.id,
+      authorId: bayuId,
+      content: "Coba kurangi distraction dulu, fokus 1 jam sehari aja cukup buat mulai.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 27),
+    },
+  });
+  comments++;
+
+  // A reply, so the answer/thread UI is visible on a fresh seed.
+  await prisma.postComment.create({
+    data: {
+      postId: userPost.id,
+      authorId: operatorId,
+      parentId: comment1.id,
+      content:
+        "Betul, mulai dari kecil aja. Minggu ini kita ada sesi belajar bareng, ikut ya!",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26),
+    },
+  });
+  comments++;
+
+  const userCommentOnSinta = await prisma.postComment.create({
+    data: {
+      postId: sintaPost.id,
+      authorId: userId,
+      content: "Saya ikut! Boleh minta lokasinya?",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3),
+    },
+  });
+  comments++;
+
+  const replyToUser = await prisma.postComment.create({
+    data: {
+      postId: sintaPost.id,
+      authorId: operatorId,
+      parentId: userCommentOnSinta.id,
+      content: "Di Pakem, nanti saya kirim detailnya lewat postingan baru.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    },
+  });
+  comments++;
+
+  await prisma.postComment.create({
+    data: {
+      postId: sintaPost.id,
+      authorId: operatorId,
+      content: "Siap, saya bantu sebarkan info meetup-nya.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4),
+    },
+  });
+  comments++;
+
+  // Likes: the demo user's post is liked by the others.
+  for (const likerId of [sintaId, bayuId, operatorId]) {
+    await prisma.postLike.create({
+      data: { postId: userPost.id, userId: likerId },
+    });
+    likes++;
+  }
+
+  await prisma.postLike.create({
+    data: { postId: sintaPost.id, userId: userId },
+  });
+  likes++;
+
+  // Shares.
+  for (const sharerId of [bayuId, operatorId]) {
+    await prisma.postShare.create({
+      data: { postId: userPost.id, userId: sharerId },
+    });
+    shares++;
+  }
+
+  await prisma.postShare.create({
+    data: { postId: sintaPost.id, userId: userId },
+  });
+  shares++;
+
+  // Notifications, mirroring what the server would have created.
+  // Personal ones for the demo user's own post.
+  const personalNotifications = [
+    {
+      userId,
+      actorId: sintaId,
+      type: "POST_LIKE" as const,
+      postId: userPost.id,
+      message: "Sinta Larasati menyukai postingammu.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 29),
+    },
+    {
+      userId,
+      actorId: bayuId,
+      type: "POST_LIKE" as const,
+      postId: userPost.id,
+      message: "Bayu Pratama menyukai postingammu.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 28),
+    },
+    {
+      userId,
+      actorId: sintaId,
+      type: "POST_COMMENT" as const,
+      postId: userPost.id,
+      commentId: comment1.id,
+      message: "Sinta Larasati mengomentari postingammu.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 28),
+    },
+    {
+      userId,
+      actorId: bayuId,
+      type: "POST_COMMENT" as const,
+      postId: userPost.id,
+      commentId: comment2.id,
+      message: "Bayu Pratama mengomentari postingammu.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 27),
+    },
+    {
+      userId,
+      actorId: bayuId,
+      type: "POST_SHARE" as const,
+      postId: userPost.id,
+      message: "Bayu Pratama membagikan postingammu.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26),
+    },
+    {
+      userId,
+      actorId: sintaId,
+      type: "POST_LIKE" as const,
+      postId: sintaPost.id,
+      message: "Sinta Larasati menyukai postingammu.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3),
+    },
+    {
+      userId,
+      actorId: operatorId,
+      type: "POST_REPLY" as const,
+      postId: sintaPost.id,
+      commentId: replyToUser.id,
+      message: "Dedi Prasetyo membalas komentarmu.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    },
+  ];
+
+  for (const notification of personalNotifications) {
+    await prisma.notification.create({
+      data: {
+        ...notification,
+        communityId: techCommunityId,
+        personal: true,
+      },
+    });
+    notifications++;
+  }
+
+  // Community-wide ones: a new post in the community the demo user joined.
+  const communityNotifications = [
+    {
+      userId,
+      actorId: sintaId,
+      type: "COMMUNITY_POST" as const,
+      postId: sintaPost.id,
+      message: "Sinta Larasati memposting di komunitas ini.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
+    },
+    {
+      userId,
+      actorId: bayuId,
+      type: "COMMUNITY_POST" as const,
+      postId: bayuPost.id,
+      message: "Bayu Pratama memposting di komunitas ini.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 90),
+    },
+    {
+      userId,
+      actorId: operatorId,
+      type: "COMMUNITY_COMMENT" as const,
+      postId: sintaPost.id,
+      message: "Dedi Prasetyo mengomentari sebuah postingan.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4),
+    },
+  ];
+
+  for (const notification of communityNotifications) {
+    await prisma.notification.create({
+      data: {
+        ...notification,
+        communityId: techCommunityId,
+        personal: false,
+      },
+    });
+    notifications++;
+  }
+
+  // One muted notification so the "Off" tab of the bell is not empty.
+  await prisma.notification.create({
+    data: {
+      userId,
+      actorId: operatorId,
+      communityId: runnersCommunityId ?? techCommunityId,
+      type: "COMMUNITY_POST",
+      personal: false,
+      message: "Dedi Prasetyo memposting di komunitas ini.",
+      mutedAt: new Date(),
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    },
+  });
+  notifications++;
+
+  // The demo user only wants personal notifications from the runners club,
+  // so the community-wide ones from it are not delivered.
+  if (runnersCommunityId) {
+    await prisma.notificationPreference.create({
+      data: {
+        userId,
+        communityId: runnersCommunityId,
+        level: "PERSONAL",
+      },
+    });
+  }
+
+  return { memberships, posts, comments, likes, shares, notifications };
 }
 
 main()

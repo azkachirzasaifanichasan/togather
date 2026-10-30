@@ -6,11 +6,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/actions/auth";
 import { LocationInput } from "@/components/LocationInput";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface SessionUser {
   name?: string | null;
   email?: string | null;
   avatarUrl?: string | null;
+  isAdmin?: boolean;
 }
 
 interface HeaderProps {
@@ -19,7 +21,7 @@ interface HeaderProps {
   onLocationChange?: (label: string, lat: number, lon: number) => void;
 }
 
-type Panel = "chat" | "notifications" | "help" | "account" | null;
+type Panel = "chat" | "help" | "account" | null;
 
 const ACCOUNT_MENU = [
   {
@@ -197,6 +199,7 @@ export function Header({ showSearch = true, locationLabel, onLocationChange }: H
           {navLink(homeHref, "Home", pathname === "/" || pathname === "/landing" || pathname === "/discovery")}
           {navLink("/komunitas", "Community", pathname.startsWith("/komunitas"))}
           {navLink("/event", "Event", pathname.startsWith("/event"))}
+          {user?.isAdmin && navLink("/admin", "Admin", pathname.startsWith("/admin"))}
         </nav>
 
         {/* Right-side icon group */}
@@ -222,23 +225,8 @@ export function Header({ showSearch = true, locationLabel, onLocationChange }: H
             </svg>
           </button>
 
-          {/* Notifications button */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!user) {
-                router.push("/login");
-              } else {
-                router.push("/notifications");
-              }
-            }}
-            aria-label="Notifikasi"
-            className={`rounded-full p-2 transition-colors hover:bg-gray-100`}
-          >
-            <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.03 2.03 0 0118 14.158V11a6 6 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-          </button>
+          {/* Notifications bell */}
+          <NotificationBell />
 
           {/* Help button */}
           <button

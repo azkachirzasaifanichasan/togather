@@ -25,6 +25,7 @@ interface EventResult {
   id: string;
   title: string;
   name?: string;
+  startDate: string;
   description: string;
   category?: InterestCategory;
   venue?: string | null;
@@ -202,7 +203,7 @@ export default function DiscoveryPage() {
 
   const markers = useMemo<MapMarker[]>(() => {
     const communityMarkers: MapMarker[] = communities
-      .map((community) => {
+      .map((community): MapMarker | null => {
         // Gunakan koordinat jika ada, fallback ke area centroid
         let lat = community.latitude;
         let lng = community.longitude;
@@ -230,7 +231,7 @@ export default function DiscoveryPage() {
       .filter((marker): marker is MapMarker => marker !== null);
 
     const eventMarkers: MapMarker[] = events
-      .map((event) => {
+      .map((event): MapMarker | null => {
         // Gunakan koordinat jika ada, fallback ke area centroid
         let lat = event.latitude;
         let lng = event.longitude;

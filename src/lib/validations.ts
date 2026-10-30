@@ -74,6 +74,22 @@ export const createCommunitySchema = z.object({
     .nullish(),
 });
 
+/**
+ * Admin edit. Only the fields an admin may rewrite are accepted; location
+ * (area/addressText) is stored separately and handled by the service.
+ */
+export const updateCommunitySchema = createCommunitySchema
+  .pick({
+    name: true,
+    description: true,
+    type: true,
+    accessType: true,
+    categories: true,
+    area: true,
+    addressText: true,
+  })
+  .partial();
+
 export const updateCommunitySubmissionStatusSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
   rejectionReason: z.string().min(10).max(500).optional(),
@@ -234,12 +250,45 @@ export const reviewJoinRequestSchema = z.object({
   action: z.enum(["APPROVE", "REJECT"]),
 });
 
+// Posts
+export const postMediaSchema = z.object({
+  url: z.string().startsWith("/uploads/posts/", "Lampiran tidak valid"),
+  type: z.enum(["image", "video"]),
+  name: z.string().max(200),
+});
+
+export const createPostSchema = z
+  .object({
+    content: z
+      .string()
+      .trim()
+      .max(2000, "Postingan maksimal 2000 karakter")
+      .default(""),
+    media: z.array(postMediaSchema).max(4, "Maksimal 4 lampiran").default([]),
+  })
+  // A post needs text or at least one attachment.
+  .refine((data) => data.content.length > 0 || data.media.length > 0, {
+    message: "Postingan tidak boleh kosong",
+    path: ["content"],
+  });
+
+export const createCommentSchema = z.object({
+  content: z.string().trim().min(1, "Komentar tidak boleh kosong").max(1000),
+  parentId: z.string().cuid("Komentar yang dibalas tidak valid").optional(),
+});
+
+// Notifications
+export const notificationLevelSchema = z.object({
+  level: z.enum(["ALL", "PERSONAL", "OFF"]),
+});
+
 // Type exports
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type CompleteProfileInput = z.infer<typeof completeProfileSchema>;
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
+export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type DiscoveryFilterInput = z.infer<typeof discoveryFilterSchema>;

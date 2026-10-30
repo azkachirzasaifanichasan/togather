@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface JoinButtonProps {
   communityId: string;
+  communityName: string;
   isMember: boolean;
   accessType: "PUBLIC" | "PRIVATE";
   isLoggedIn: boolean;
@@ -26,6 +28,7 @@ function readErrorMessage(payload: unknown) {
 
 export function JoinButton({
   communityId,
+  communityName,
   isMember: initialIsMember,
   accessType,
   isLoggedIn,
@@ -36,6 +39,7 @@ export function JoinButton({
   const [requestStatus, setRequestStatus] = useState(initialRequestStatus);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const callApi = async (method: "POST" | "DELETE") => {
     setPending(true);
@@ -75,6 +79,14 @@ export function JoinButton({
     }
   };
 
+  const handleClick = () => {
+    if (isMember) {
+      setConfirmLeave(true);
+      return;
+    }
+    callApi("POST");
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="flex flex-col items-end gap-2">
@@ -112,7 +124,7 @@ export function JoinButton({
     <div className="flex flex-col items-end gap-2">
       <button
         type="button"
-        onClick={() => callApi(isMember ? "DELETE" : "POST")}
+        onClick={handleClick}
         disabled={pending}
         className={`rounded-lg px-6 py-3 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
           isMember
@@ -134,6 +146,19 @@ export function JoinButton({
           {message}
         </p>
       )}
+
+      <ConfirmDialog
+        open={confirmLeave}
+        title="Keluar dari komunitas?"
+        description={`Yakin mau keluar dari komunitas "${communityName}"? Kamu tidak akan menerima notifikasi dari komunitas ini lagi, dan harus bergabung kembali untuk melihat postingannya.`}
+        confirmLabel="Ya, keluar"
+        busy={pending}
+        onCancel={() => setConfirmLeave(false)}
+        onConfirm={() => {
+          setConfirmLeave(false);
+          callApi("DELETE");
+        }}
+      />
     </div>
   );
 }

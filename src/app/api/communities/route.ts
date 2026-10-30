@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDiscoveryCommunities, submitCommunity } from "@/server/communities";
+import { approveCommunitySubmission } from "@/server/admin";
 import {
   communityDiscoveryQuerySchema,
   createCommunitySchema,
@@ -134,11 +135,17 @@ export async function POST(request: NextRequest) {
 
     const community = await submitCommunity(ctx.userId, data);
 
+    // Admin-created communities are live immediately: an admin approving their
+    // own submission would be a pointless extra step.
+    if (ctx.isAdmin && community.submission) {
+      await approveCommunitySubmission(community.submission.id, ctx.userId);
+    }
+
     return NextResponse.json(
       {
         success: true,
         communityId: community.id,
-        submissionStatus: "PENDING",
+        submissionStatus: ctx.isAdmin ? "APPROVED" : "PENDING",
       },
       { status: 201 }
     );

@@ -212,6 +212,9 @@ also exposing the flat `latitude` / `longitude` fields. `null` means "no locatio
 | `GET /api/admin/submissions` | ADMIN |
 | `POST /api/admin/submissions/[id]/approve` | ADMIN |
 | `POST /api/admin/submissions/[id]/reject` | ADMIN |
+| `GET /api/admin/communities` | ADMIN |
+| `PATCH /api/admin/communities/[id]` | ADMIN |
+| `DELETE /api/admin/communities/[id]` | ADMIN |
 | `GET /api/organizer/join-requests` | ORGANIZER (of at least one community) |
 | `POST /api/organizer/join-requests/[id]/review` | ORGANIZER of that request's community, or ADMIN |
 | `GET /api/organizer/communities/[id]/members` | ORGANIZER of that community, or ADMIN |
@@ -577,6 +580,10 @@ Returns the communities the caller has joined plus the communities they organize
 
 Submits a new community for admin approval. Requires a **VERIFIED** profile.
 
+An **ADMIN** caller is exempt from the profile requirement, and the community is
+approved immediately (`submissionStatus: "APPROVED"`) with the admin as its first
+organizer and member.
+
 **Body** (validated with `createCommunitySchema`):
 
 ```json
@@ -912,6 +919,89 @@ Calling it twice with the same value is safe — the attendance row is upserted.
 **Errors:** `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 NOT_FOUND` (unknown registration id),
 `422 VALIDATION_ERROR` (missing/invalid `attended`), `500 INTERNAL_ERROR`.
 
+### 9.8 `GET /api/admin/communities`
+
+Lists every community regardless of submission status (approved, pending, rejected, or
+none), with counts. Admin only.
+
+**Response `200`:**
+
+```json
+{
+  "communities": [
+    {
+      "id": "clx...",
+      "name": "Sleman Youth Islamic Study",
+      "description": "...",
+      "type": "OFFLINE",
+      "accessType": "PUBLIC",
+      "categories": ["KEAGAMAAN"],
+      "area": "SLEMAN",
+      "addressText": "Jl. ...",
+      "createdAt": "2026-10-29T11:17:34.999Z",
+      "memberCount": 12,
+      "organizerCount": 2,
+      "eventCount": 3,
+      "submission": {
+        "id": "clx...",
+        "status": "APPROVED",
+        "submittedAt": "2026-10-29T11:17:34.999Z",
+        "rejectionReason": null
+      }
+    }
+  ]
+}
+```
+
+`submission` is `null` when the community has no submission row. `area`/`addressText`
+are `null` for online communities.
+
+**Errors:** `401 UNAUTHORIZED`, `403 FORBIDDEN`, `500 INTERNAL_ERROR`.
+
+### 9.9 `PATCH /api/admin/communities/[id]`
+
+Rewrites a community's fields. Admin only. Every field is optional; only the fields sent
+are changed.
+
+**Body:**
+
+```json
+{
+  "name": "New name",
+  "description": "New description",
+  "type": "OFFLINE",
+  "accessType": "PUBLIC",
+  "categories": ["OLAHRAGA"],
+  "area": "SLEMAN",
+  "addressText": "Jl. Kaliurang Km 5"
+}
+```
+
+Switching `type` to `ONLINE` clears `area` and `addressText`. Switching to `OFFLINE`
+stores the ones provided.
+
+**Response `200`:**
+
+```json
+{ "success": true, "communityId": "clx..." }
+```
+
+**Errors:** `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 COMMUNITY_NOT_FOUND`,
+`422 VALIDATION_ERROR`, `500 INTERNAL_ERROR`.
+
+### 9.10 `DELETE /api/admin/communities/[id]`
+
+Hard-deletes a community. Admin only. Location, organizers, memberships, join requests,
+submission and event links cascade; the events themselves are kept.
+
+**Response `200`:**
+
+```json
+{ "success": true }
+```
+
+**Errors:** `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 COMMUNITY_NOT_FOUND`, `500 INTERNAL_ERROR`.
+
 ---
 
 ## 10. Organizer endpoints
@@ -1095,6 +1185,9 @@ All endpoints listed below are **implemented** and verified at runtime.
 | `/api/admin/events` | POST | implemented |
 | `/api/admin/events/[id]` | PATCH | implemented |
 | `/api/admin/events/registrations/[id]/attendance` | POST | implemented |
+| `/api/admin/communities` | GET | implemented |
+| `/api/admin/communities/[id]` | PATCH | implemented |
+| `/api/admin/communities/[id]` | DELETE | implemented |
 | `/api/organizer/join-requests` | GET | implemented |
 | `/api/organizer/join-requests/[id]/review` | POST | implemented |
 | `/api/organizer/communities/[id]/members` | GET | implemented |

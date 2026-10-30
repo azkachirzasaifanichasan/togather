@@ -5,6 +5,60 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
+type MyCommunity = {
+  id: string;
+  name: string;
+  memberCount: number;
+};
+
+function MyCommunityList({ communities }: { communities: MyCommunity[] }) {
+  return (
+    <div className="space-y-2">
+      {communities.map((community) => (
+        <Link
+          key={community.id}
+          href={`/komunitas/${community.id}`}
+          className="group flex items-center gap-3 rounded-lg p-2 hover:bg-gray-100"
+        >
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-200">
+            <span className="font-semibold text-gray-700">
+              {community.name.charAt(0)}
+            </span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-gray-900">
+              {community.name}
+            </p>
+            <p className="text-xs text-gray-500">{community.memberCount} anggota</p>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function MyCommunitySection({
+  title,
+  communities,
+  emptyText,
+}: {
+  title: string;
+  communities: MyCommunity[];
+  emptyText: string;
+}) {
+  if (communities.length === 0 && !emptyText) return null;
+
+  return (
+    <div className="mb-6">
+      <h3 className="mb-3 text-sm font-semibold text-gray-700">{title}</h3>
+      <MyCommunityList communities={communities} />
+      {communities.length === 0 && emptyText && (
+        <p className="text-sm italic text-gray-500">{emptyText}</p>
+      )}
+    </div>
+  );
+}
+
 export default async function KomunitasPage({
   searchParams,
 }: {
@@ -18,6 +72,10 @@ export default async function KomunitasPage({
   const allCommunities = await getDiscoveryCommunities(query ? { search: query } : {});
 
   const memberIds = new Set(userCommunities.map((c) => c.id));
+
+  // Komunitas yang dibuat user (dia organizer) vs yang hanya diikuti
+  const ownedCommunities = userCommunities.filter((c) => c.isOrganizer);
+  const joinedCommunities = userCommunities.filter((c) => !c.isOrganizer);
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -49,50 +107,46 @@ export default async function KomunitasPage({
               </div>
             </form>
 
-            <div className="mb-6">
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Komunitasmu</h3>
-              <div className="space-y-2">
-                {userCommunities.map((community) => (
-                  <Link
-                    key={community.id}
-                    href={`/komunitas/${community.id}`}
-                    className="group flex items-center gap-3 rounded-lg p-2 hover:bg-gray-100"
-                  >
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-200">
-                      <span className="font-semibold text-gray-700">
-                        {community.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-gray-900">
-                        {community.name}
-                      </p>
-                      <p className="text-xs text-gray-500">{community.memberCount} anggota</p>
-                    </div>
-                  </Link>
-                ))}
-                {userCommunities.length === 0 && (
-                  <p className="text-sm italic text-gray-500">
-                    {session ? "Belum ada komunitas." : "Masuk untuk melihat komunitasmu."}
-                  </p>
-                )}
-              </div>
-            </div>
+            <MyCommunitySection
+              title="Dibuat olehmu"
+              communities={ownedCommunities}
+              emptyText={session ? "Belum ada komunitas yang kamu buat." : "Masuk untuk melihat komunitasmu."}
+            />
+            <MyCommunitySection
+              title="Diikuti"
+              communities={joinedCommunities}
+              emptyText={session ? "Belum ada komunitas yang kamu ikuti." : "Masuk untuk melihat komunitasmu."}
+            />
 
             <div className="rounded-xl bg-gray-50 p-4 text-xs text-gray-600">
-              Ingin membuat komunitas? Pengajuan komunitas tersedia untuk pengguna terverifikasi.
+              Ingin membuat komunitas?{" "}
+              <Link href="/komunitas/buat" className="font-semibold text-[#7960D7] hover:underline">
+                Ajukan di sini
+              </Link>
+              . Pengajuan tersedia untuk pengguna terverifikasi.
             </div>
           </div>
         </aside>
 
         <main className="min-w-0 flex-1">
-          <div className="mb-8">
-            <h1 className="mb-2 text-3xl font-bold text-gray-900">Jelajahi komunitas</h1>
-            <p className="text-gray-600">
-              {query
-                ? `${allCommunities.length} komunitas cocok dengan "${query}"`
-                : `${allCommunities.length} komunitas aktif di DIY`}
-            </p>
+          <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="mb-2 text-3xl font-bold text-gray-900">Jelajahi komunitas</h1>
+              <p className="text-gray-600">
+                {query
+                  ? `${allCommunities.length} komunitas cocok dengan "${query}"`
+                  : `${allCommunities.length} komunitas aktif di DIY`}
+              </p>
+            </div>
+            <Link
+              href="/komunitas/buat"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#7960D7] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#6850C7]"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Buat komunitas
+            </Link>
           </div>
 
           {/* Search bar for mobile */}
@@ -116,6 +170,22 @@ export default async function KomunitasPage({
               </svg>
             </div>
           </form>
+
+          {/* Komunitasmu untuk mobile — sidebar desktop disembunyikan di layar kecil */}
+          {userCommunities.length > 0 && (
+            <div className="mb-6 lg:hidden">
+              <MyCommunitySection
+                title="Dibuat olehmu"
+                communities={ownedCommunities}
+                emptyText=""
+              />
+              <MyCommunitySection
+                title="Diikuti"
+                communities={joinedCommunities}
+                emptyText=""
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {allCommunities.map((community) => (

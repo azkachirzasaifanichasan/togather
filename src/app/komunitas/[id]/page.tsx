@@ -1,11 +1,15 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
-import { getCommunityProfileById, getUserCommunities } from "@/server/communities";
+import { getCommunityProfileById } from "@/server/communities";
+import { getCommunityPosts, canPostInCommunity } from "@/server/posts";
+import { getNotificationLevel } from "@/server/notifications";
 import Link from "next/link";
 import Image from "next/image";
 
 import { Header } from "@/components/Header";
 import { JoinButton } from "@/components/communities/JoinButton";
+import { CommunityFeed } from "@/components/communities/CommunityFeed";
+import { NotificationLevelMenu } from "@/components/communities/NotificationLevelMenu";
 
 export default async function CommunityProfilePage({
   params,
@@ -26,84 +30,28 @@ export default async function CommunityProfilePage({
     notFound();
   }
 
-  const { upcomingEvents } = community;
   const admin = community.hosts[0];
   const isMember = community.isMember;
+  const isOrganizer = community.hosts.length > 0;
 
-  // Get user's communities for sidebar
-  const userCommunities = (await getUserCommunities(session.user.id)).slice(0, 4);
+  // Members and organizers see the feed; in a private community nobody else
+  // may read the posts.
+  const canViewFeed = isMember || isOrganizer;
+  const [posts, canPost, notificationLevel] = await Promise.all([
+    canViewFeed
+      ? getCommunityPosts(id, session.user.id)
+      : Promise.resolve([]),
+    canPostInCommunity(session.user.id, id),
+    getNotificationLevel(session.user.id, id),
+  ]);
 
   return (
     <div className="min-h-screen bg-white">
       <Header />
 
-      <div className="mx-auto max-w-7xl px-6 py-8 flex gap-8">
-        {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0">
-          <div className="sticky top-24">
-            <h2 className="mb-6 text-2xl font-bold text-gray-900">Community</h2>
-
-            <div className="mb-6">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search communities"
-                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#7960D7]"
-                />
-                <svg
-                  className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Your community</h3>
-              <div className="space-y-2">
-                {userCommunities.map((membership) => {
-                  const isActive = membership.id === community.id;
-                  return (
-                    <Link
-                      key={membership.id}
-                      href={`/komunitas/${membership.id}`}
-                      className={`flex items-center gap-3 rounded-lg p-2 group ${
-                        isActive ? "bg-[#7960D7]/10" : "hover:bg-gray-100"
-                      }`}
-                    >
-                      <div
-                        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${
-                          isActive ? "bg-[#7960D7]" : "bg-gray-200"
-                        }`}
-                      >
-                        <span className={`font-semibold ${isActive ? "text-white" : "text-gray-700"}`}>
-                          {membership.name.charAt(0)}
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`truncate text-sm font-semibold ${isActive ? "text-[#7960D7]" : "text-gray-900"}`}>
-                          {membership.name}
-                        </p>
-                        <p className="text-xs text-gray-500">{membership.memberCount} members</p>
-                      </div>
-                      {isActive && (
-                        <svg className="h-5 w-5 flex-shrink-0 text-[#7960D7]" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </aside>
-
+      <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Main content */}
-        <main className="min-w-0 flex-1 max-w-4xl">
+        <main className="min-w-0">
           <Link
             href="/komunitas"
             className="mb-6 inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
@@ -121,7 +69,7 @@ export default async function CommunityProfilePage({
               src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80"
               alt={community.name}
               fill
-              sizes="(max-width: 768px) 100vw, 768px"
+              sizes="(max-width: 768px) 100vw, 1280px"
               className="object-cover"
             />
           </div>
@@ -133,77 +81,33 @@ export default async function CommunityProfilePage({
               <p className="max-w-2xl text-lg leading-relaxed text-gray-600">
                 {community.description}
               </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-[#7960D7]">
+                  {community.memberCount} anggota
+                </span>
+                <span className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600">
+                  {community.accessType === "PUBLIC" ? "Publik" : "Privat"}
+                </span>
+                <span className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600">
+                  {community.type === "ONLINE" ? "Online" : "Offline"}
+                </span>
+              </div>
             </div>
-            <JoinButton
-              communityId={community.id}
-              isMember={isMember}
-              accessType={community.accessType}
-              isLoggedIn={Boolean(session?.user)}
-              initialRequestStatus={null}
-            />
-          </div>
-
-          {/* Stats */}
-          <div className="mb-12 grid grid-cols-3 gap-4">
-            <div className="rounded-2xl bg-[#7960D7] p-6 text-white">
-              <p className="mb-2 text-5xl font-bold">{community.memberCount}</p>
-              <p className="text-sm text-purple-100">members</p>
-            </div>
-            <div className="rounded-2xl border-2 border-gray-200 bg-white p-6">
-              <p className="mb-2 text-5xl font-bold text-gray-900">{upcomingEvents.length}</p>
-              <p className="text-sm text-gray-600">upcoming events</p>
-            </div>
-            <div className="rounded-2xl border-2 border-gray-200 bg-white p-6">
-              <p className="mb-2 text-2xl font-bold text-gray-900">
-                {community.accessType === "PUBLIC" ? "Publik" : "Privat"}
-              </p>
-              <p className="text-sm text-gray-600">
-                {community.type === "ONLINE" ? "Komunitas online" : "Komunitas offline"}
-              </p>
-            </div>
-          </div>
-
-          {/* Upcoming events */}
-          <div className="mb-12">
-            <div className="mb-6 flex items-center justify-between">
-              <h3 className="text-2xl font-bold text-gray-900">Upcoming events</h3>
-              <Link href="/event" className="font-semibold text-[#7960D7] hover:underline">
-                See all
-              </Link>
-            </div>
-            <div className="space-y-4">
-              {upcomingEvents.map((event) => {
-                const eventDate = new Date(event.startDate);
-                const day = eventDate.getDate();
-                const month = eventDate.toLocaleString("en", { month: "short" }).toUpperCase();
-
-                return (
-                  <Link
-                    key={event.id}
-                    href={`/event/${event.id}`}
-                    className="group flex items-center gap-4 rounded-xl border border-gray-200 p-4 transition-shadow hover:shadow-md"
-                  >
-                    <div className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-[#7960D7]">
-                      <span className="text-2xl font-bold text-white">{day}</span>
-                      <span className="text-xs text-purple-200">{month}</span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-gray-900 transition-colors group-hover:text-[#7960D7]">
-                        {event.name}
-                      </h4>
-                      <p className="mt-1 text-sm text-gray-600">
-                        {event.startTime || "TBA"} · {event.venue || "TBA"}
-                      </p>
-                    </div>
-                    <span className="text-sm font-medium text-[#7960D7] group-hover:underline">
-                      Detail
-                    </span>
-                  </Link>
-                );
-              })}
-              {upcomingEvents.length === 0 && (
-                <p className="py-8 text-center text-gray-500">No upcoming events</p>
+            <div className="flex items-start gap-3">
+              {isMember && (
+                <NotificationLevelMenu
+                  communityId={community.id}
+                  initialLevel={notificationLevel}
+                />
               )}
+              <JoinButton
+                communityId={community.id}
+                communityName={community.name}
+                isMember={isMember}
+                accessType={community.accessType}
+                isLoggedIn={Boolean(session?.user)}
+                initialRequestStatus={null}
+              />
             </div>
           </div>
 
@@ -219,12 +123,31 @@ export default async function CommunityProfilePage({
                 </div>
                 <div>
                   <p className="font-bold text-gray-900">{admin?.name || "Anonymous"}</p>
-                  <p className="text-sm text-gray-600">
-                    Community host · {upcomingEvents.length} events hosted
-                  </p>
+                  <p className="text-sm text-gray-600">Pembuat komunitas</p>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Postingan */}
+          <div className="mt-12">
+            <h3 className="mb-6 text-2xl font-bold text-gray-900">Postingan</h3>
+            {canViewFeed ? (
+              <CommunityFeed
+                communityId={community.id}
+                canPost={canPost}
+                initialPosts={posts}
+              />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-gray-200 py-12 text-center">
+                <p className="text-sm font-semibold text-gray-900">
+                  Postingan hanya untuk anggota
+                </p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Gabung komunitas ini untuk melihat dan membuat postingan.
+                </p>
+              </div>
+            )}
           </div>
         </main>
       </div>
