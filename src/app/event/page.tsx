@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { EventBanner } from "@/components/events/EventBanner";
@@ -7,7 +5,7 @@ import type { BannerEvent } from "@/components/events/EventBanner";
 import { EventCard } from "@/components/events/EventCard";
 import { AREA_LABELS, INTEREST_LABELS } from "@/lib/community-labels";
 import { formatEventDate, formatEventPrice } from "@/lib/event-format";
-import { getEventBackdrop, getEventCover } from "@/lib/event-images";
+import { getEventBackdrop } from "@/lib/event-images";
 import { getUpcomingEvents } from "@/server/events";
 import type { EventSummary } from "@/server/events";
 
@@ -51,14 +49,6 @@ function toBannerEvent(event: EventSummary): BannerEvent {
   };
 }
 
-function locationOf(event: EventSummary) {
-  return (
-    event.venue ||
-    (event.area ? AREA_LABELS[event.area] : null) ||
-    "Lokasi menyusul"
-  );
-}
-
 export default async function EventPage({
   searchParams,
 }: {
@@ -74,16 +64,12 @@ export default async function EventPage({
 
   const sortedEvents = sortBySchedule(searchedEvents);
   const upcomingEvents = sortedEvents.filter((event) => event.status !== "SELESAI");
-  const pastEvents = sortedEvents.filter((event) => event.status === "SELESAI");
 
   const bannerEvents = sortBySchedule(
     allEvents.filter((event) => event.status !== "SELESAI")
   )
     .slice(0, 5)
     .map(toBannerEvent);
-
-  const upcomingCount = allEvents.filter((event) => event.status !== "SELESAI").length;
-  const pastCount = allEvents.length - upcomingCount;
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -95,16 +81,13 @@ export default async function EventPage({
           <div className="mx-auto w-full max-w-7xl px-6 lg:px-8 py-8">
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                <span>Kurasi Terverifikasi</span>
-                <span className="text-gray-300">•</span>
-                <span>Events Komunitas</span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl font-bold text-[#1F2937]">
                 Events
               </h1>
               <p className="text-sm text-gray-600 max-w-2xl">
-                Temukan events yang sesuai dengan minat dan jadwal kamu di Yogyakarta
+                Temukan info events menarik yang sesuai dengan minatmu 
               </p>
             </div>
           </div>
