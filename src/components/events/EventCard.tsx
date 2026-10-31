@@ -1,255 +1,223 @@
-"use client";
-
 import Link from "next/link";
-import { InterestCategory } from "@prisma/client";
-import { useState } from "react";
+import type { Area, InterestCategory } from "@prisma/client";
 
-interface EventCardProps {
-  event: {
-    id: string;
-    name: string;
-    description: string;
-    startDate: Date;
-    startTime?: string | null;
-    venue?: string | null;
-    area?: string | null;
-    category?: InterestCategory;
-    quota?: number | null;
-    fee?: string | null;
-    organizer?: string | null;
-    relatedCommunities?: Array<{ id: string; name: string }>;
-    _count?: { registrations?: number };
-  };
-  type?: "INFORMATIONAL" | "INTERACTIVE";
-  showPreview?: boolean;
+import { AREA_LABELS, INTEREST_LABELS } from "@/lib/community-labels";
+import { formatEventPrice } from "@/lib/event-format";
+import { getEventCover } from "@/lib/event-images";
+
+export type EventCardData = {
+  id: string;
+  name: string;
+  startDate: Date;
+  startTime?: string | null;
+  venue?: string | null;
+  area?: Area | null;
+  category?: InterestCategory | null;
+  fee?: string | null;
+  organizer?: string | null;
+  attendeeCount?: number;
+  status?: "MENDATANG" | "BERLANGSUNG" | "SELESAI";
+  imageUrl?: string | null;
+  description?: string | null;
+};
+
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+
+const WEEKDAY_SHORT = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+
+export function EventCard({ event }: { event: EventCardData }) {
+  const cover = event.imageUrl || getEventCover(event);
+  const startDate = new Date(event.startDate);
+  const price = formatEventPrice(event.fee);
+  const isFree = price === "Gratis";
+  const category = event.category ? INTEREST_LABELS[event.category] : "Event";
+  const location =
+    event.venue ||
+    (event.area ? AREA_LABELS[event.area] : null) ||
+    "Lokasi menyusul";
+  const isPast = event.status === "SELESAI";
+  const isLive = event.status === "BERLANGSUNG";
+  const description = event.description?.trim();
+
+  return (
+    <Link
+      href={`/event/${event.id}`}
+      className="group relative z-0 flex flex-col rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:z-30 hover:-translate-y-1 hover:border-[#7960D7]/40 hover:shadow-[0_18px_40px_-24px_rgba(26,26,23,0.45)] focus:outline-none focus-visible:z-30 focus-visible:ring-2 focus-visible:ring-[#7960D7] focus-visible:ring-offset-2"
+    >
+      {/* Image */}
+      <div className="relative aspect-[16/10] overflow-hidden rounded-t-xl bg-gray-200">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={cover}
+          alt=""
+          loading="lazy"
+          draggable={false}
+          className={`h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06] ${
+            isPast ? "opacity-60" : ""
+          }`}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+        {/* Date Badge */}
+        <div className="absolute left-3 top-3 overflow-hidden rounded-lg bg-white/95 text-center shadow-[0_10px_24px_-16px_rgba(0,0,0,0.55)] ring-1 ring-black/5 backdrop-blur">
+          <p className="bg-[#7960D7] px-2.5 py-[3px] text-[8px] font-bold uppercase tracking-[0.18em] text-white">
+            {MONTH_SHORT[startDate.getMonth()]}
+          </p>
+          <p className="px-2.5 pt-1 text-[17px] font-bold leading-none tracking-[-0.02em] text-[#1F2937] tabular-nums">
+            {String(startDate.getDate()).padStart(2, "0")}
+          </p>
+          <p className="px-2.5 pb-1 pt-0.5 text-[7px] font-semibold uppercase tracking-[0.14em] text-gray-400">
+            {WEEKDAY_SHORT[startDate.getDay()]}
+          </p>
+        </div>
+
+        {isLive ? (
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-[#1A1A17]/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white backdrop-blur">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 rounded-full bg-[#C8B8FF]"
+            />
+            Berlangsung
+          </span>
+        ) : null}
+      </div>
+
+      {/* Content */}
+      <div className="flex flex-1 flex-col p-3 sm:p-4">
+        <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#7960D7] sm:text-[10px]">
+          {category}
+        </span>
+
+        <h3 className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug tracking-[-0.01em] text-[#1F2937] transition-colors group-hover:text-[#7960D7] sm:text-[15px]">
+          {event.name}
+        </h3>
+
+        <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-500 sm:mt-2.5 sm:text-[11px]">
+          {event.startTime ? (
+            <>
+              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
+                <ClockIcon />
+                <span className="font-medium">{event.startTime}</span>
+              </span>
+              <span aria-hidden="true" className="h-3 w-px shrink-0 bg-gray-200" />
+            </>
+          ) : null}
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <PinIcon />
+            <span className="truncate font-medium">{location}</span>
+          </span>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-gray-100 pt-3 sm:gap-3 sm:pt-3.5">
+          <span
+            className={`whitespace-nowrap text-xs font-bold sm:text-[13px] ${
+              isFree ? "text-[#7960D7]" : "text-[#1F2937]"
+            }`}
+          >
+            {price}
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#7960D7] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-white transition-colors group-hover:bg-[#6950c7] sm:px-3 sm:text-[10px]">
+            Daftar
+            <ArrowIcon />
+          </span>
+        </div>
+      </div>
+
+      {/* Hover description */}
+      <div
+        role="tooltip"
+        className="pointer-events-none absolute bottom-[calc(100%+14px)] left-1/2 z-40 hidden w-64 -translate-x-1/2 translate-y-1.5 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 lg:block"
+      >
+        <div className="rounded-lg bg-[#1A1A17] p-4 text-left shadow-[0_24px_48px_-24px_rgba(0,0,0,0.6)]">
+          <p className="text-[8px] font-semibold uppercase tracking-[0.2em] text-[#C8B8FF]">
+            Tentang acara
+          </p>
+          <p className="mt-2 line-clamp-4 text-[12px] leading-5 text-white/70">
+            {description || "Deskripsi acara akan segera tersedia."}
+          </p>
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-2.5">
+            <span className="min-w-0 truncate text-[10px] text-white/45">
+              oleh {event.organizer || "Komunitas"}
+            </span>
+            <span className="shrink-0 text-[10px] font-medium text-white/85">
+              Lihat detail →
+            </span>
+          </div>
+        </div>
+        <span
+          aria-hidden="true"
+          className="absolute left-1/2 top-full -mt-[5px] h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-[#1A1A17]"
+        />
+      </div>
+    </Link>
+  );
 }
 
-export function EventCard({ event, type = "INFORMATIONAL", showPreview = true }: EventCardProps) {
-  const eventDate = new Date(event.startDate);
-  const day = eventDate.getDate();
-  const month = eventDate.toLocaleString("id-ID", { month: "short" }).toUpperCase();
-  const weekday = eventDate.toLocaleString("id-ID", { weekday: "short" }).toUpperCase();
-  const attendeeCount = event._count?.registrations ?? 0;
-  const [isHovering, setIsHovering] = useState(false);
-  
-  // Tentukan tipe event jika tidak ditentukan
-  const eventType = type || (event.quota || event.fee ? "INTERACTIVE" : "INFORMATIONAL");
-
-  // Format harga jika ada fee
-  const formatPrice = (fee: string | null | undefined) => {
-    if (!fee || fee === "Gratis") return "Gratis";
-    const price = fee.replace(/[^\d]/g, "");
-    return price ? `Rp ${parseInt(price).toLocaleString("id-ID")}` : "Gratis";
-  };
-
-  // Preview hover content
-  const PreviewContent = () => (
-    <div className="absolute inset-x-0 top-full z-50 mt-2 rounded-xl border border-gray-200 bg-white p-4 shadow-xl transition-all duration-300">
-      <div className="mb-3">
-        <h4 className="font-semibold text-gray-900 mb-2">Quick Preview</h4>
-        <p className="text-sm text-gray-600 line-clamp-3">{event.description}</p>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div>
-          <span className="text-gray-500">Waktu:</span>
-          <div className="font-medium">{event.startTime || "TBA"}</div>
-        </div>
-        <div>
-          <span className="text-gray-500">Kuota:</span>
-          <div className="font-medium">
-            {event.quota ? `${attendeeCount}/${event.quota}` : "Unlimited"}
-          </div>
-        </div>
-        <div>
-          <span className="text-gray-500">Biaya:</span>
-          <div className="font-medium text-[#7960D7]">{formatPrice(event.fee)}</div>
-        </div>
-        <div>
-          <span className="text-gray-500">Status:</span>
-          <div className="font-medium">
-            {event.quota && attendeeCount >= event.quota ? "Penuh" : "Tersedia"}
-          </div>
-        </div>
-      </div>
-      
-      <div className="mt-3 pt-3 border-t border-gray-100">
-        <Link 
-          href={`/event/${event.id}`}
-          className="block text-center text-sm font-medium text-[#7960D7] hover:text-[#6950c7]"
-        >
-          Lihat detail lengkap →
-        </Link>
-      </div>
-    </div>
-  );
-
-  // Card untuk INTERACTIVE events
-  if (eventType === "INTERACTIVE") {
-    return (
-      <div 
-        className="relative" 
-        onMouseEnter={() => showPreview && setIsHovering(true)}
-        onMouseLeave={() => showPreview && setIsHovering(false)}
-      >
-        <Link href={`/event/${event.id}`} className="group block">
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-            {/* Header dengan tanggal dan badge */}
-            <div className="relative p-4">
-              <div className="absolute left-4 top-4">
-                <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-[#7960D7] shadow-md">
-                  <span className="text-xl font-bold text-white">{day}</span>
-                  <span className="text-xs font-medium text-purple-100">{month}</span>
-                </div>
-              </div>
-              
-              <div className="pl-20">
-                <h3 className="mb-2 text-lg font-bold text-gray-900 line-clamp-1 group-hover:text-[#7960D7]">
-                  {event.name}
-                </h3>
-                
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#7960D7]/10 px-3 py-1 text-xs font-medium text-[#7960D7]">
-                    Interactive
-                  </span>
-                  {event.fee && (
-                    <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800">
-                      {formatPrice(event.fee)}
-                    </span>
-                  )}
-                  {event.category && (
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                      {event.category}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Quick info bar */}
-            <div className="border-t border-gray-100 px-4 py-3 bg-gray-50/50">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-1">
-                  <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-gray-700">{event.startTime || "TBA"}</span>
-                </div>
-                
-                <div className="flex items-center gap-1">
-                  <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  </svg>
-                  <span className="text-gray-700 truncate max-w-[120px]">
-                    {event.venue || event.area?.replaceAll("_", " ") || "Online"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Participants info */}
-            <div className="px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    <div className="h-6 w-6 rounded-full bg-gray-300 border-2 border-white"></div>
-                    <div className="h-6 w-6 rounded-full bg-gray-400 border-2 border-white"></div>
-                    <div className="h-6 w-6 rounded-full bg-gray-500 border-2 border-white"></div>
-                  </div>
-                  <span className="text-sm text-gray-600">{attendeeCount} peserta</span>
-                </div>
-                
-                <div className="text-xs text-gray-500">
-                  {event.quota ? `${((attendeeCount / event.quota) * 100).toFixed(0)}% terisi` : "Tersedia"}
-                </div>
-              </div>
-              
-              {/* Progress bar */}
-              {event.quota && (
-                <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
-                  <div 
-                    className="h-full bg-green-500 transition-all duration-500"
-                    style={{ width: `${Math.min((attendeeCount / event.quota) * 100, 100)}%` }}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Action button */}
-            <div className="border-t border-gray-100 p-3">
-              <button className="w-full rounded-lg bg-[#7960D7] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#6950c7] hover:shadow-md">
-                Lihat Detail
-              </button>
-            </div>
-          </div>
-        </Link>
-
-        {/* Hover Preview */}
-        {showPreview && isHovering && <PreviewContent />}
-      </div>
-    );
-  }
-
-  // Card untuk INFORMATIONAL events (lebih clean)
+function ClockIcon() {
   return (
-    <div 
-      className="relative"
-      onMouseEnter={() => showPreview && setIsHovering(true)}
-      onMouseLeave={() => showPreview && setIsHovering(false)}
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0 text-gray-400"
     >
-      <Link href={`/event/${event.id}`} className="group block">
-        <div className="rounded-xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:shadow-lg hover:border-[#7960D7]/20 hover:-translate-y-0.5">
-          <div className="flex gap-4">
-            {/* Date circle */}
-            <div className="flex-shrink-0">
-              <div className="flex h-14 w-14 flex-col items-center justify-center rounded-full bg-[#7960D7]">
-                <span className="text-lg font-bold text-white">{day}</span>
-                <span className="text-[10px] text-purple-100">{month}</span>
-              </div>
-            </div>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
-            {/* Content */}
-            <div className="min-w-0 flex-1">
-              <div className="mb-2 flex items-start justify-between">
-                <h3 className="text-base font-bold text-gray-900 line-clamp-1 group-hover:text-[#7960D7]">
-                  {event.name}
-                </h3>
-                <span className="flex-shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                  Info
-                </span>
-              </div>
-              
-              <p className="mb-3 line-clamp-2 text-sm text-gray-600">{event.description}</p>
-              
-              <div className="flex items-center gap-3 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>{event.startTime || "Waktu TBA"}</span>
-                </div>
-                
-                <div className="flex items-center gap-1">
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  </svg>
-                  <span>{event.venue || event.area?.replaceAll("_", " ") || "Online"}</span>
-                </div>
-                
-                <div className="ml-auto flex items-center gap-1">
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13 0h-6m0 0V8a3 3 0 016 0v8z" />
-                  </svg>
-                  <span>{attendeeCount}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Link>
+function PinIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0 text-gray-400"
+    >
+      <path
+        d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
 
-      {/* Hover Preview untuk informational juga */}
-      {showPreview && isHovering && <PreviewContent />}
-    </div>
+function ArrowIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+      className="hidden h-3 w-3 transition-transform duration-300 group-hover:translate-x-0.5 sm:block"
+    >
+      <path
+        d="M5 12h14M13 6l6 6-6 6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

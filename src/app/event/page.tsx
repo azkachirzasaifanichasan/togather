@@ -1,219 +1,201 @@
-import { auth } from "@/lib/auth";
+import { Footer } from "@/components/Footer";
+import { Header } from "@/components/Header";
+import { EventBanner } from "@/components/events/EventBanner";
+import type { BannerEvent } from "@/components/events/EventBanner";
+import { EventCard } from "@/components/events/EventCard";
+import { AREA_LABELS, INTEREST_LABELS } from "@/lib/community-labels";
+import { formatEventDate, formatEventPrice } from "@/lib/event-format";
+import { getEventBackdrop } from "@/lib/event-images";
 import { getUpcomingEvents } from "@/server/events";
 import type { EventSummary } from "@/server/events";
-import Link from "next/link";
 
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { EventCard } from "@/components/events/EventCard";
+function sortBySchedule(events: EventSummary[]): EventSummary[] {
+  const now = Date.now();
+  return [...events].sort((a, b) => {
+    const aPast = a.startDate.getTime() < now;
+    const bPast = b.startDate.getTime() < now;
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    return aPast
+      ? b.startDate.getTime() - a.startDate.getTime()
+      : a.startDate.getTime() - b.startDate.getTime();
+  });
+}
 
-const TABS = [
-  { key: "all", label: "Semua Events" },
-  { key: "saved", label: "Disimpan" },
-] as const;
+function matchesQuery(event: EventSummary, query: string): boolean {
+  return [
+    event.name,
+    event.description,
+    event.venue,
+    event.organizer,
+    event.category,
+    event.area,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
+function toBannerEvent(event: EventSummary): BannerEvent {
+  return {
+    id: event.id,
+    name: event.name,
+    category: INTEREST_LABELS[event.category].toUpperCase(),
+    date: formatEventDate(new Date(event.startDate)),
+    time: event.startTime,
+    venue: event.venue || (event.area ? AREA_LABELS[event.area] : "Lokasi menyusul"),
+    price: formatEventPrice(event.fee),
+    image: getEventBackdrop(event),
+  };
+}
 
 export default async function EventPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
-  const session = await auth();
-  const { tab } = await searchParams;
-  const activeTab = TABS.some((item) => item.key === tab) ? (tab as string) : "all";
+  const { q } = await searchParams;
+  const query = (q ?? "").trim();
 
-  // Ambil semua events untuk semua users
   const allEvents = await getUpcomingEvents();
+  const searchedEvents = query
+    ? allEvents.filter((event) => matchesQuery(event, query.toLowerCase()))
+    : allEvents;
 
-  // Tentukan events yang akan ditampilkan
-  let currentEvents: EventSummary[] = [];
-  
-  if (activeTab === "all") {
-    // Tab "Semua Events" - untuk semua users
-    currentEvents = allEvents;
-  } else {
-    // Tab "Disimpan" - belum tersedia
-    currentEvents = [];
-  }
+  const sortedEvents = sortBySchedule(searchedEvents);
+  const upcomingEvents = sortedEvents.filter((event) => event.status !== "SELESAI");
+
+  const bannerEvents = sortBySchedule(
+    allEvents.filter((event) => event.status !== "SELESAI")
+  )
+    .slice(0, 5)
+    .map(toBannerEvent);
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <Header />
+      <Header showSearch={false} />
 
-      <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-12">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">
-              Events
-            </h1>
-            <p className="mt-2 text-gray-600">
-              {activeTab === "all" 
-                ? `Temukan ${allEvents.length} event di sekitar Anda`
-                : "Bookmark event akan tersedia di fase berikutnya"}
-            </p>
-          </div>
-          <Link
-            href="/discovery"
-            className="rounded-full border border-gray-300 px-5 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
-          >
-            Cari event baru
-          </Link>
-        </div>
-
-        {/* Tabs untuk semua user */}
-        <div className="mb-8 flex items-center gap-2 border-b border-gray-200">
-          {TABS.map((item) => (
-            <Link
-              key={item.key}
-              href={`/event?tab=${item.key}`}
-              className={`-mb-px rounded-t-lg px-5 py-3 text-sm font-semibold transition-colors ${
-                activeTab === item.key
-                  ? "bg-[#7960D7] text-white"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-
-        {activeTab === "all" ? (
-          // Tab "Semua Events"
-          currentEvents.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
-              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
-                <svg className="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+      <main className="flex-1">
+        {/* Header Section */}
+        <div className="border-b border-gray-200 bg-white">
+          <div className="mx-auto w-full max-w-7xl px-6 lg:px-8 py-8">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
               </div>
-              <h3 className="mb-2 text-xl font-bold text-gray-900">Belum ada events saat ini</h3>
-              <p className="mb-6 text-gray-600 max-w-md mx-auto">
-                Events akan muncul di sini saat komunitas mulai mengadakan acara. Coba lagi nanti atau jelajahi komunitas terlebih dahulu.
+
+              <h1 className="text-3xl sm:text-4xl font-bold text-[#1F2937]">
+                Events
+              </h1>
+              <p className="text-sm text-gray-600 max-w-2xl">
+                Temukan info events menarik yang sesuai dengan minatmu 
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Link href="/discovery" className="rounded-lg bg-[#7960D7] px-6 py-3 text-sm font-semibold text-white hover:bg-[#6950c7]">
-                  Explore Communities
-                </Link>
-                <button className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                  Refresh
-                </button>
-              </div>
             </div>
-          ) : (
-            <div className="space-y-10">
-              {/* Stats Bar */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-                  <div className="text-xl font-bold text-[#7960D7]">{currentEvents.length}</div>
-                  <div className="text-xs text-gray-600">Total Events</div>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-                  <div className="text-xl font-bold text-green-600">
-                    {currentEvents.filter(e => e.quota || e.fee).length}
-                  </div>
-                  <div className="text-xs text-gray-600">Interactive</div>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-                  <div className="text-xl font-bold text-blue-600">
-                    {currentEvents.filter(e => !e.quota && !e.fee).length}
-                  </div>
-                  <div className="text-xs text-gray-600">Informational</div>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-                  <div className="text-xl font-bold text-orange-600">
-                    {currentEvents.filter(e => !e.fee || e.fee === "Gratis").length}
-                  </div>
-                  <div className="text-xs text-gray-600">Free Events</div>
-                </div>
-              </div>
-
-              {/* Interactive Events Section */}
-              <div>
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Interactive Events</h3>
-                    <p className="text-sm text-gray-600">Events dengan tiket, kuota, dan sistem pendaftaran</p>
-                  </div>
-                  <Link href="/event?type=interactive" className="text-sm font-medium text-[#7960D7] hover:text-[#6950c7]">
-                    Lihat semua →
-                  </Link>
-                </div>
-                
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {currentEvents
-                    .filter(event => event.quota || event.fee)
-                    .slice(0, 6)
-                    .map((event) => (
-                      <EventCard 
-                        key={event.id} 
-                        event={event} 
-                        type="INTERACTIVE"
-                        showPreview={true}
-                      />
-                    ))}
-                </div>
-                
-                {currentEvents.filter(event => event.quota || event.fee).length === 0 && (
-                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                    <p className="text-gray-600">Belum ada interactive events saat ini</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Informational Events Section */}
-              <div>
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Info & Workshop</h3>
-                    <p className="text-sm text-gray-600">Seminar, workshop, dan event informasi lainnya</p>
-                  </div>
-                  <Link href="/event?type=informational" className="text-sm font-medium text-[#7960D7] hover:text-[#6950c7]">
-                    Lihat semua →
-                  </Link>
-                </div>
-                
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
-                  {currentEvents
-                    .filter(event => !event.quota && !event.fee)
-                    .slice(0, 5)
-                    .map((event) => (
-                      <EventCard 
-                        key={event.id} 
-                        event={event} 
-                        type="INFORMATIONAL"
-                        showPreview={true}
-                      />
-                    ))}
-                </div>
-                
-                {currentEvents.filter(event => !event.quota && !event.fee).length === 0 && (
-                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                    <p className="text-gray-600">Belum ada informational events saat ini</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        ) : (
-          // Tab "Disimpan" - placeholder
-          <div className="rounded-xl border border-dashed border-gray-200 py-16 text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[#7960D7]/10">
-              <svg className="h-8 w-8 text-[#7960D7]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-            </div>
-            <h2 className="mb-2 text-2xl font-bold text-gray-900">Fitur Disimpan Segera Hadir</h2>
-            <p className="mx-auto mb-6 max-w-md text-gray-600">
-              Bookmark event favorit Anda akan tersedia di fase pengembangan berikutnya.
-            </p>
-            <Link
-              href="/event?tab=all"
-              className="inline-block rounded-lg bg-[#7960D7] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#6950c7]"
-            >
-              Lihat Semua Events
-            </Link>
           </div>
-        )}
-      </div>
+        </div>
+
+        {/* Event Banner Carousel */}
+        {bannerEvents.length > 0 && !query ? (
+          <div className="mx-auto w-full max-w-7xl px-6 lg:px-8 py-6">
+            <EventBanner events={bannerEvents} />
+          </div>
+        ) : null}
+
+        {/* Search & Filter Toolbar - BELOW BANNER */}
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-8 py-6 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Search Section */}
+            <form action="/event" method="get" role="search" className="relative flex-1">
+              <svg
+                className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="search"
+                name="q"
+                defaultValue={query}
+                placeholder="Cari events"
+                className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#7960D7]"
+              />
+            </form>
+
+            {/* Area Dropdown */}
+            <select className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-[#374151] hover:border-[#7960D7] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#7960D7]/30 cursor-pointer transition-colors"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 10px center",
+                paddingRight: "28px",
+              }}>
+              <option value="">Semua Wilayah</option>
+              <option value="kota">Kota Yogyakarta</option>
+              <option value="sleman">Sleman</option>
+              <option value="bantul">Bantul</option>
+              <option value="kulonprogo">Kulon Progo</option>
+              <option value="gunungkidul">Gunungkidul</option>
+            </select>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Olahraga
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Teknologi
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Pendidikan
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Seni & Hiburan
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Sosial
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Lingkungan
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Bisnis & Karier
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Hobi
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Keagamaan
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-50 text-[#6B7280] hover:bg-[#EEE9FF] hover:text-[#7960D7] transition-all shrink-0">
+              Lainnya
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content - Events Grid */}
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-8 pb-20 pt-6">
+          {upcomingEvents.length > 0 ? (
+            <section className="py-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {upcomingEvents.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          
+
+          {sortedEvents.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-sm font-medium text-gray-900">Belum ada event yang ditemukan</p>
+              <p className="mt-1 text-sm text-gray-600">Coba ubah filter atau kata kunci pencarian</p>
+            </div>
+          ) : null}
+        </div>
+      </main>
 
       <Footer />
     </div>
