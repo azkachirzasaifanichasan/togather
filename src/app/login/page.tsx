@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { ForgotPasswordModal } from "@/components/auth/ForgotPasswordModal";
 
 // useSearchParams needs a Suspense boundary in the App Router.
 export default function LoginPage() {
@@ -17,11 +18,17 @@ export default function LoginPage() {
 
 function LoginForm() {
   const router = useRouter();
-  const registered = useSearchParams().get("registered");
+  const searchParams = useSearchParams();
+  const registered = searchParams.get("registered");
+  const verified = searchParams.get("verified");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [successBanner, setSuccessBanner] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
+
   // Only show the social button when the provider is actually configured on
   // the server. Otherwise clicking it would dead-end on an auth error page.
   const [googleEnabled, setGoogleEnabled] = useState(false);
@@ -54,7 +61,11 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError("Email atau password salah");
+        if (result.error.includes("terkunci") || result.error.includes("locked")) {
+          setError(result.error);
+        } else {
+          setError("Email atau password salah");
+        }
       } else {
         router.push("/");
         router.refresh();
@@ -99,9 +110,21 @@ function LoginForm() {
             </p>
           </div>
 
-          {registered && !error && (
+          {verified && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+              Email Anda telah berhasil diverifikasi! Silakan masuk.
+            </div>
+          )}
+
+          {registered && !verified && !error && !successBanner && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
               Akun berhasil dibuat. Silakan masuk.
+            </div>
+          )}
+
+          {successBanner && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+              {successBanner}
             </div>
           )}
 
@@ -150,9 +173,13 @@ function LoginForm() {
                 <input type="checkbox" className="rounded border-gray-300 text-[#7960D7] focus:ring-[#7960D7]" />
                 <span className="ml-2 text-sm text-[#6B7280]">Remember me</span>
               </label>
-              <span className="cursor-default text-sm text-gray-500" title="Segera hadir">
+              <button
+                type="button"
+                onClick={() => setIsForgotOpen(true)}
+                className="text-sm text-[#7960D7] hover:underline font-medium"
+              >
                 Lupa password?
-              </span>
+              </button>
             </div>
 
             {/* Submit Button */}
@@ -212,6 +239,17 @@ function LoginForm() {
           </Link>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={isForgotOpen}
+        initialEmail={email}
+        onClose={() => setIsForgotOpen(false)}
+        onSuccess={(resetEmail) => {
+          setEmail(resetEmail);
+          setSuccessBanner("Kata sandi berhasil diperbarui! Silakan masuk dengan kata sandi baru.");
+        }}
+      />
     </div>
   );
 }

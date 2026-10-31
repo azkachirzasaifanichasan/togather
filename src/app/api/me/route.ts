@@ -27,9 +27,13 @@ export async function GET() {
       throw new Error("UNAUTHORIZED");
     }
 
-    const [ctx, profile] = await Promise.all([
+    const [ctx, profile, user] = await Promise.all([
       getAccountContext(),
       prisma.userProfile.findUnique({ where: { userId: session.user.id } }),
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { emailVerifiedAt: true, agreedToTermsAt: true },
+      }),
     ]);
 
     const isComplete = ctx.status === "VERIFIED";
@@ -41,6 +45,8 @@ export async function GET() {
         email: session.user.email,
         avatarUrl: profile?.avatarUrl ?? null,
         isAdmin: session.user.isAdmin ?? false,
+        emailVerifiedAt: user?.emailVerifiedAt ?? null,
+        agreedToTermsAt: user?.agreedToTermsAt ?? null,
       },
       // Shape used by the account/profile flows.
       status: ctx.status,

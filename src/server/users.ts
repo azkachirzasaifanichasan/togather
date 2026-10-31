@@ -7,8 +7,9 @@ import { UpdateProfileInput, CompleteProfileInput } from "@/lib/validations";
  * Create a new user account.
  */
 export async function createUser(email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
   const existingUser = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
   });
 
   if (existingUser) {
@@ -19,8 +20,10 @@ export async function createUser(email: string, password: string) {
 
   const user = await prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       passwordHash,
+      agreedToTermsAt: new Date(),
+      termsVersion: "1.0",
       profile: {
         create: {},
       },
@@ -196,8 +199,9 @@ export async function resolveOAuthUser({
     return existingAccount.user;
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
   const existingUser = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
     include: { profile: true },
   });
 
@@ -227,9 +231,12 @@ export async function resolveOAuthUser({
 
   const user = await prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       passwordHash,
       isAdmin: false,
+      emailVerifiedAt: new Date(),
+      agreedToTermsAt: new Date(),
+      termsVersion: "1.0",
       profile: {
         create: {
           name: name ?? null,

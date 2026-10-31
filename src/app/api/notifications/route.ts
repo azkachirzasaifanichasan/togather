@@ -6,26 +6,20 @@ import {
   markNotificationsRead,
 } from "@/server/notifications";
 import { errorResponse } from "@/lib/api-error";
-import type { NotificationTab } from "@/server/notifications";
-
-const TABS: NotificationTab[] = ["all", "personal", "off"];
 
 /**
- * List the notifications of the current user for one tab of the bell
- * dropdown, with the unread counts used by the tabs and the bell badge.
+ * List the notifications of the current user, with the unread count used by
+ * the bell badge.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       throw new Error("UNAUTHORIZED");
     }
 
-    const requested = request.nextUrl.searchParams.get("tab") as NotificationTab | null;
-    const tab: NotificationTab = requested && TABS.includes(requested) ? requested : "all";
-
     const [notifications, unreadCounts] = await Promise.all([
-      getNotifications(session.user.id, tab),
+      getNotifications(session.user.id),
       getUnreadCounts(session.user.id),
     ]);
 

@@ -4,6 +4,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { auth } from "@/lib/auth";
 import { ApiError, ErrorCode, errorResponse } from "@/lib/api-error";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -74,6 +75,17 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       throw new Error("UNAUTHORIZED");
+    }
+
+    // Rate limit: max 15 uploads per 10 minutes per user/IP
+    const clientIp = getClientIp(request);
+    const rl = rateLimit(`upload:user:${session.user.id}:${clientIp}`, 15, 10 * 60 * 1000);
+    if (!rl.success) {
+      throw new ApiError(
+        429,
+        ErrorCode.RATE_LIMITED,
+        "Terlalu banyak permintaan unggahan file. Silakan tunggu beberapa menit sebelum mencoba lagi."
+      );
     }
 
     const form = await request.formData();

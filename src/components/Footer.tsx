@@ -99,9 +99,13 @@ export function Footer() {
               <p className="text-sm text-gray-400">
                 © 2026 Togather. Dibuat untuk komunitas DIY.
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
-                <Soon>Ketentuan layanan</Soon>
-                <Soon>Kebijakan privasi</Soon>
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400">
+                <Link href="/terms" className="hover:text-white transition-colors">
+                  Ketentuan layanan
+                </Link>
+                <Link href="/privacy" className="hover:text-white transition-colors">
+                  Kebijakan privasi
+                </Link>
                 <Soon>Kebijakan cookie</Soon>
               </div>
             </div>

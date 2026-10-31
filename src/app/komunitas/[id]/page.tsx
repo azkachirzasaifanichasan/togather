@@ -167,6 +167,7 @@ export default async function CommunityProfilePage({
                 communityId={community.id}
                 canPost={canPost}
                 initialPosts={posts}
+                viewerId={session.user.id}
               />
             ) : (
               <div className="rounded-2xl border border-dashed border-gray-200 py-12 text-center">

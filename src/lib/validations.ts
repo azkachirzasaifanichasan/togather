@@ -282,6 +282,23 @@ export const createCommentSchema = z.object({
   parentId: z.string().cuid("Komentar yang dibalas tidak valid").optional(),
 });
 
+// Moderation
+export const createReportSchema = z.object({
+  targetType: z.enum(["POST", "COMMENT"]),
+  targetId: z.string().min(1, "Target laporan tidak valid").max(50),
+  reason: z.enum([
+    "MINOR",
+    "BULLYING",
+    "SUICIDE_SELF_HARM",
+    "VIOLENCE",
+    "RESTRICTED_ITEMS",
+    "ADULT_CONTENT",
+    "SCAM",
+    "INTELLECTUAL_PROPERTY",
+    "NOT_INTERESTED",
+  ]),
+});
+
 // Notifications
 export const notificationLevelSchema = z.object({
   level: z.enum(["ALL", "PERSONAL", "OFF"]),

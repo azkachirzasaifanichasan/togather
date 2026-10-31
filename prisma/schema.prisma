@@ -12,6 +12,12 @@ model User {
   email                String                   @unique
   passwordHash         String
   isAdmin              Boolean                  @default(false)
+  emailVerifiedAt      DateTime?
+  agreedToTermsAt      DateTime?
+  termsVersion         String?
+  failedLoginAttempts  Int                      @default(0)
+  lockedUntil          DateTime?
+  tokenVersion         Int                      @default(0)
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   accounts             Account[]
@@ -27,8 +33,14 @@ model User {
   comments             PostComment[]
   likes                PostLike[]
   shares               PostShare[]
+  saves                PostSave[]
   activities           UserActivityHistory[]
   profile              UserProfile?
+  verificationCodes    VerificationCode[]
+  contentReports       ContentReport[]
+  hiddenComments       HiddenComment[]
+  blocksMade           UserBlock[]              @relation("UserBlocks")
+  blocksReceived       UserBlock[]              @relation("BlockedBy")
 }
 
 /// *
@@ -269,6 +281,7 @@ model CommunityPost {
   comments      PostComment[]
   likes         PostLike[]
   shares        PostShare[]
+  saves         PostSave[]
 
   @@index([communityId, createdAt])
   @@index([authorId])
@@ -286,6 +299,7 @@ model PostComment {
   parent        PostComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies       PostComment[]  @relation("CommentReplies")
   post          CommunityPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  hiddenBy      HiddenComment[]
 
   @@index([postId, createdAt])
   @@index([authorId])
@@ -314,12 +328,76 @@ model PostShare {
   post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([postId, userId])
   @@index([postId])
   @@index([userId])
 }
 
 /// *
-///  * A notification delivered to one recipient.
+///  * A post bookmarked by a user. One row per user and post, so saving is a
+///  * toggle rather than a counter.
+model PostSave {
+  id        String        @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+/// *
+///  * A report filed by a user against a post or a comment.
+///  *
+///  * `targetId` points at either `CommunityPost` or `PostComment` depending on
+///  * `targetType`; the pair is unique per reporter so re-reporting updates the
+///  * reason instead of stacking duplicate rows.
+model ContentReport {
+  id         String           @id @default(cuid())
+  reporterId String
+  targetType ReportTargetType
+  targetId   String
+  reason     ReportReason
+  createdAt  DateTime         @default(now())
+  reporter   User             @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([targetType, targetId])
+  @@index([reason])
+  @@index([createdAt])
+}
+
+/// *
+///  * A comment hidden from one viewer's thread. Hiding is personal: the
+///  * comment stays visible to everybody else.
+model HiddenComment {
+  id        String      @id @default(cuid())
+  userId    String
+  commentId String
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+}
+
+/// *
+///  * A block between two users. Blocking is mutual for visibility: neither
+///  * side sees the other's posts or comments in a feed.
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   User     @relation("UserBlocks", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
 ///  *
 ///  * `personal` marks the POST_* types: they concern the recipient's own post
 ///  * and survive a PERSONAL notification level. `mutedAt` is set when the
@@ -434,10 +512,52 @@ enum NotificationLevel {
   OFF
 }
 
+enum ReportTargetType {
+  POST
+  COMMENT
+}
+
+/// *
+///  * The reason chosen in the report sheet. Mirrors the options shown in the
+///  * UI so a stored report can be triaged without a lookup table.
+enum ReportReason {
+  MINOR
+  BULLYING
+  SUICIDE_SELF_HARM
+  VIOLENCE
+  RESTRICTED_ITEMS
+  ADULT_CONTENT
+  SCAM
+  INTELLECTUAL_PROPERTY
+  NOT_INTERESTED
+}
+
 enum Area {
   KOTA_YOGYAKARTA
   SLEMAN
   BANTUL
   KULON_PROGO
   GUNUNGKIDUL
+}
+
+enum VerificationCodeType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  LOGIN_OTP
+}
+
+model VerificationCode {
+  id        String               @id @default(cuid())
+  userId    String?
+  email     String
+  code      String
+  type      VerificationCodeType
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime             @default(now())
+  user      User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, type])
+  @@index([code])
+  @@index([userId])
 }

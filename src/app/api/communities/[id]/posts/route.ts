@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createPost, getCommunityPosts } from "@/server/posts";
-import { errorResponse } from "@/lib/api-error";
+import { ApiError, ErrorCode, errorResponse } from "@/lib/api-error";
+import { rateLimit } from "@/lib/rate-limit";
 import { createPostSchema } from "@/lib/validations";
 
 /**
@@ -35,6 +36,15 @@ export async function POST(
     const session = await auth();
     if (!session?.user?.id) {
       throw new Error("UNAUTHORIZED");
+    }
+
+    const rl = rateLimit(`post:user:${session.user.id}`, 10, 5 * 60 * 1000);
+    if (!rl.success) {
+      throw new ApiError(
+        429,
+        ErrorCode.RATE_LIMITED,
+        "Terlalu sering membuat postingan. Silakan tunggu beberapa saat."
+      );
     }
 
     const { id: communityId } = await params;

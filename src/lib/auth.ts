@@ -1,9 +1,15 @@
-﻿import NextAuth from "next-auth";
+import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { resolveOAuthUser } from "@/server/users";
+import {
+  checkAccountLockout,
+  normalizeEmail,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+} from "@/server/auth-verification";
 
 /**
  * Google sign-in is only enabled when credentials are configured.
@@ -30,29 +36,44 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
+        const email = normalizeEmail(credentials.email as string);
+        const password = credentials.password as string;
+
+        // Check account brute-force lockout
+        const lockout = await checkAccountLockout(email);
+        if (lockout.locked) {
+          throw new Error(
+            `Akun Anda terkunci sementara karena beberapa kali gagal login. Silakan tunggu ${lockout.remainingMinutes} menit.`
+          );
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email },
           include: { profile: true },
         });
 
         if (!user?.passwordHash) {
+          await recordFailedLogin(email);
           return null;
         }
 
-        const isValid = await compare(
-          credentials.password as string,
-          user.passwordHash
-        );
+        const isValid = await compare(password, user.passwordHash);
 
         if (!isValid) {
+          await recordFailedLogin(email);
           return null;
         }
+
+        // Reset failed login counter on success
+        await recordSuccessfulLogin(user.id);
 
         return {
           id: user.id,
           email: user.email,
           name: user.profile?.name || user.email,
           isAdmin: user.isAdmin,
+          emailVerifiedAt: user.emailVerifiedAt,
+          tokenVersion: user.tokenVersion,
         };
       },
     }),
@@ -83,10 +104,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // store OUR user id in the token, so that every API route can look up
       // the user by `session.user.id`.
       if (account?.provider === "google" && account.providerAccountId) {
-        const email = profile?.email ?? user.email;
-        if (!email) {
+        const rawEmail = profile?.email ?? user.email;
+        if (!rawEmail) {
           return token;
         }
+        const email = normalizeEmail(rawEmail);
 
         const dbUser = await resolveOAuthUser({
           provider: account.provider,
@@ -106,12 +128,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = dbUser.id;
         token.isAdmin = dbUser.isAdmin;
         token.name = dbUser.profile?.name ?? email;
+        token.emailVerifiedAt = dbUser.emailVerifiedAt;
+        token.tokenVersion = dbUser.tokenVersion;
         return token;
       }
 
       if (user) {
         token.id = user.id as string;
         token.isAdmin = user.isAdmin;
+        token.emailVerifiedAt = user.emailVerifiedAt;
+        token.tokenVersion = user.tokenVersion;
       }
       return token;
     },
@@ -119,6 +145,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.isAdmin = token.isAdmin as boolean;
+        session.user.emailVerifiedAt = token.emailVerifiedAt;
+        session.user.tokenVersion = token.tokenVersion;
       }
       return session;
     },

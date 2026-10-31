@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { NotificationType, type Prisma } from "@prisma/client";
+import {
+  NotificationType,
+  ReportReason,
+  ReportTargetType,
+  type Prisma,
+} from "@prisma/client";
 import { notify } from "@/server/notifications";
 
 /**
@@ -56,6 +61,84 @@ function readMedia(value: Prisma.JsonValue | null): PostMedia[] {
 
     return [];
   });
+}
+
+type ViewerModerationState = {
+  blockedUserIds: string[];
+  hiddenCommentIds: string[];
+  notInterestedPostIds: string[];
+  notInterestedCommentIds: string[];
+};
+
+const EMPTY_MODERATION: ViewerModerationState = {
+  blockedUserIds: [],
+  hiddenCommentIds: [],
+  notInterestedPostIds: [],
+  notInterestedCommentIds: [],
+};
+
+/**
+ * The viewer's moderation state, applied when reading a feed or a thread:
+ * blocked users, hidden comments, and posts/comments the viewer reported as
+ * "I don't want to see this".
+ */
+async function getViewerModerationState(
+  viewerId?: string
+): Promise<ViewerModerationState> {
+  if (!viewerId) return EMPTY_MODERATION;
+
+  const [blocks, hiddenComments, reports] = await Promise.all([
+    prisma.userBlock.findMany({
+      where: {
+        OR: [{ blockerId: viewerId }, { blockedId: viewerId }],
+      },
+      select: { blockerId: true, blockedId: true },
+    }),
+    prisma.hiddenComment.findMany({
+      where: { userId: viewerId },
+      select: { commentId: true },
+    }),
+    prisma.contentReport.findMany({
+      where: { reporterId: viewerId, reason: ReportReason.NOT_INTERESTED },
+      select: { targetType: true, targetId: true },
+    }),
+  ]);
+
+  const blocked = new Set<string>();
+  for (const block of blocks) {
+    blocked.add(block.blockerId === viewerId ? block.blockedId : block.blockerId);
+  }
+
+  return {
+    blockedUserIds: [...blocked],
+    hiddenCommentIds: hiddenComments.map((row) => row.commentId),
+    notInterestedPostIds: reports
+      .filter((report) => report.targetType === ReportTargetType.POST)
+      .map((report) => report.targetId),
+    notInterestedCommentIds: reports
+      .filter((report) => report.targetType === ReportTargetType.COMMENT)
+      .map((report) => report.targetId),
+  };
+}
+
+/**
+ * Is there a block between these two users, in either direction? Used to stop
+ * a comment/reply from crossing a block even if the UI is bypassed.
+ */
+async function isBlockedBetween(userA: string, userB: string) {
+  if (userA === userB) return false;
+
+  const block = await prisma.userBlock.findFirst({
+    where: {
+      OR: [
+        { blockerId: userA, blockedId: userB },
+        { blockerId: userB, blockedId: userA },
+      ],
+    },
+    select: { id: true },
+  });
+
+  return Boolean(block);
 }
 
 /**
@@ -138,10 +221,20 @@ export async function getCommunityPosts(
     }
   }
 
+  const moderation = await getViewerModerationState(viewerId);
+
   // shortcut: read twice the page and re-rank in memory. A real ranking
   // would live in SQL once the feed grows past a demo.
   const posts = await prisma.communityPost.findMany({
-    where: { communityId },
+    where: {
+      communityId,
+      ...(moderation.blockedUserIds.length > 0
+        ? { authorId: { notIn: moderation.blockedUserIds } }
+        : {}),
+      ...(moderation.notInterestedPostIds.length > 0
+        ? { id: { notIn: moderation.notInterestedPostIds } }
+        : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: limit * 2,
     include: {
@@ -178,6 +271,52 @@ export async function getCommunityPosts(
       )
     : new Set<string>();
 
+  const savedIds = viewerId
+    ? new Set(
+        (
+          await prisma.postSave.findMany({
+            where: {
+              userId: viewerId,
+              postId: { in: ranked.map(({ post }) => post.id) },
+            },
+            select: { postId: true },
+          })
+        ).map((s) => s.postId)
+      )
+    : new Set<string>();
+
+  // The `_count.comments` relation counts every comment, including authors
+  // the viewer blocked and comments they reported as not interested. Hidden
+  // comments still count: they stay in the thread as a row the viewer can
+  // expand again. Recompute only when the viewer has some of that moderation
+  // state, so the common path stays one query.
+  const moderated =
+    moderation.blockedUserIds.length > 0 ||
+    moderation.notInterestedCommentIds.length > 0;
+
+  const visibleCommentCounts = new Map<string, number>();
+  if (viewerId && moderated && ranked.length > 0) {
+    const comments = await prisma.postComment.findMany({
+      where: {
+        postId: { in: ranked.map(({ post }) => post.id) },
+        ...(moderation.blockedUserIds.length > 0
+          ? { authorId: { notIn: moderation.blockedUserIds } }
+          : {}),
+        ...(moderation.notInterestedCommentIds.length > 0
+          ? { id: { notIn: moderation.notInterestedCommentIds } }
+          : {}),
+      },
+      select: { id: true, postId: true, parentId: true },
+    });
+
+    for (const comment of comments) {
+      visibleCommentCounts.set(
+        comment.postId,
+        (visibleCommentCounts.get(comment.postId) ?? 0) + 1
+      );
+    }
+  }
+
   return ranked.map(({ post, isOrganizerPost }) => ({
     id: post.id,
     content: post.content,
@@ -190,9 +329,12 @@ export async function getCommunityPosts(
     },
     isOrganizerPost,
     likeCount: post._count.likes,
-    commentCount: post._count.comments,
+    commentCount: moderated
+      ? visibleCommentCounts.get(post.id) ?? 0
+      : post._count.comments,
     shareCount: post._count.shares,
     likedByViewer: likedIds.has(post.id),
+    savedByViewer: savedIds.has(post.id),
   }));
 }
 
@@ -222,25 +364,47 @@ export async function getPostComments(postId: string, viewerId?: string) {
     }
   }
 
+  const moderation = await getViewerModerationState(viewerId);
+
   const comments = await prisma.postComment.findMany({
-    where: { postId },
+    where: {
+      postId,
+      ...(moderation.blockedUserIds.length > 0
+        ? { authorId: { notIn: moderation.blockedUserIds } }
+        : {}),
+      ...(moderation.notInterestedCommentIds.length > 0
+        ? { id: { notIn: moderation.notInterestedCommentIds } }
+        : {}),
+    },
     orderBy: { createdAt: "asc" },
     include: {
       author: { select: { id: true, profile: { select: { name: true, avatarUrl: true } } } },
     },
   });
 
-  return comments.map((comment) => ({
-    id: comment.id,
-    content: comment.content,
-    parentId: comment.parentId,
-    createdAt: comment.createdAt.toISOString(),
-    author: {
-      id: comment.author.id,
-      name: comment.author.profile?.name ?? "Anggota",
-      avatarUrl: comment.author.profile?.avatarUrl ?? null,
-    },
-  }));
+  // Hiding is a viewer preference, not a delete: the comment stays in the
+  // thread as a collapsed row the viewer can expand again, and the content is
+  // withheld from the response until they do.
+  const hidden = new Set(moderation.hiddenCommentIds);
+
+  return comments.map((comment) => {
+    const isHidden =
+      hidden.has(comment.id) ||
+      Boolean(comment.parentId && hidden.has(comment.parentId));
+
+    return {
+      id: comment.id,
+      content: isHidden ? "" : comment.content,
+      parentId: comment.parentId,
+      hidden: isHidden,
+      createdAt: comment.createdAt.toISOString(),
+      author: {
+        id: comment.author.id,
+        name: comment.author.profile?.name ?? "Anggota",
+        avatarUrl: comment.author.profile?.avatarUrl ?? null,
+      },
+    };
+  });
 }
 
 /**
@@ -321,6 +485,12 @@ export async function createComment(
     throw new Error("FORBIDDEN");
   }
 
+  // A blocked author's thread is not a place to start or continue a
+  // conversation.
+  if (await isBlockedBetween(userId, post.authorId)) {
+    throw new Error("FORBIDDEN");
+  }
+
   // The parent must belong to the same post. Replies are flattened to one
   // level: replying to a reply attaches to its top-level comment.
   let rootId: string | null = null;
@@ -334,6 +504,10 @@ export async function createComment(
 
     if (!parent || parent.postId !== postId) {
       throw new Error("NOT_FOUND");
+    }
+
+    if (await isBlockedBetween(userId, parent.authorId)) {
+      throw new Error("FORBIDDEN");
     }
 
     rootId = parent.parentId ?? parent.id;
@@ -490,9 +664,16 @@ export async function sharePost(userId: string, postId: string) {
     throw new Error("FORBIDDEN");
   }
 
-  await prisma.postShare.create({ data: { postId, userId } });
+  // One share per user: sharing again keeps the count and stays silent.
+  const existing = await prisma.postShare.findUnique({
+    where: { postId_userId: { postId, userId } },
+  });
 
-  if (post.authorId !== userId) {
+  if (!existing) {
+    await prisma.postShare.create({ data: { postId, userId } });
+  }
+
+  if (!existing && post.authorId !== userId) {
     const authorName =
       (
         await prisma.userProfile.findUnique({
@@ -514,5 +695,117 @@ export async function sharePost(userId: string, postId: string) {
 
   const shareCount = await prisma.postShare.count({ where: { postId } });
 
-  return { shareCount };
+  return { shared: true, alreadyShared: !!existing, shareCount };
+}
+
+/**
+ * Toggle the save (bookmark) on a post.
+ *
+ * Unlike a share, saving is private: there is no count and no notification,
+ * and the saved list feeds the "Saved" tab of the sidebar.
+ */
+export async function toggleSave(userId: string, postId: string) {
+  const post = await prisma.communityPost.findUnique({
+    where: { id: postId },
+    select: { communityId: true },
+  });
+
+  if (!post) {
+    throw new Error("NOT_FOUND");
+  }
+
+  const access = await getCommunityAccess(userId, post.communityId);
+  if (!access?.isMember) {
+    throw new Error("FORBIDDEN");
+  }
+
+  const existing = await prisma.postSave.findUnique({
+    where: { postId_userId: { postId, userId } },
+  });
+
+  if (existing) {
+    await prisma.postSave.delete({ where: { postId_userId: { postId, userId } } });
+  } else {
+    await prisma.postSave.create({ data: { postId, userId } });
+  }
+
+  return { saved: !existing };
+}
+
+export type SavedPostItem = {
+  saveId: string;
+  savedAt: string;
+  id: string;
+  content: string;
+  media: PostMedia[];
+  createdAt: string;
+  community: { id: string; name: string };
+  author: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+  };
+  authorName: string;
+};
+
+/**
+ * The posts this user saved, newest save first.
+ *
+ * Posts from blocked users are excluded so a viewer's blocks are respected
+ * across the entire app.
+ */
+export async function getSavedPosts(userId: string): Promise<SavedPostItem[]> {
+  const moderation = await getViewerModerationState(userId);
+
+  const rows = await prisma.postSave.findMany({
+    where: {
+      userId,
+      ...(moderation.blockedUserIds.length > 0
+        ? { post: { authorId: { notIn: moderation.blockedUserIds } } }
+        : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      post: {
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          media: true,
+          community: { select: { id: true, name: true } },
+          author: {
+            select: {
+              id: true,
+              profile: { select: { name: true, avatarUrl: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return rows.map(({ id, createdAt, post }) => ({
+    saveId: id,
+    savedAt: createdAt.toISOString(),
+    id: post.id,
+    content: post.content,
+    media: readMedia(post.media),
+    createdAt: post.createdAt.toISOString(),
+    community: post.community,
+    author: {
+      id: post.author.id,
+      name: post.author.profile?.name ?? "Anggota",
+      avatarUrl: post.author.profile?.avatarUrl ?? null,
+    },
+    authorName: post.author.profile?.name ?? "Anggota",
+  }));
+}
+
+/**
+ * Remove a save. Deleting a row that is not there is a no-op, so the saved
+ * list can call it twice without harm.
+ */
+export async function unsavePost(userId: string, postId: string) {
+  await prisma.postSave.deleteMany({ where: { userId, postId } });
+  return { saved: false };
 }

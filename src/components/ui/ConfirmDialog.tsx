@@ -8,6 +8,7 @@ interface ConfirmDialogProps {
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  confirmVariant?: "danger" | "primary";
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -25,6 +26,7 @@ export function ConfirmDialog({
   description,
   confirmLabel = "Ya, lanjutkan",
   cancelLabel = "Batal",
+  confirmVariant = "danger",
   busy = false,
   onConfirm,
   onCancel,
@@ -84,7 +86,11 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`rounded-lg px-5 py-2.5 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+              confirmVariant === "danger"
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-[#7960D7] hover:bg-[#684fc9]"
+            }`}
           >
             {busy ? "Memproses..." : confirmLabel}
           </button>

@@ -4,16 +4,12 @@ import { NotificationLevel, NotificationType } from "@prisma/client";
 /**
  * Notifications for the bell dropdown.
  *
- * Two levels of filtering:
- * - `NotificationPreference` (per user, per community) decides whether a
- *   notification is created at all. OFF means nothing is delivered;
- *   PERSONAL means only personal notifications are;
- * - `Notification.mutedAt` mutes a single notification from the dropdown.
+ * `NotificationPreference` (per user, per community) decides whether a
+ * notification is created at all. OFF means nothing is delivered;
+ * PERSONAL means only personal notifications are.
  *
  * A missing preference row means ALL.
  */
-
-export type NotificationTab = "all" | "personal" | "off";
 
 /**
  * Does a notification level deliver a notification of this kind?
@@ -26,15 +22,6 @@ export function levelDelivers(level: NotificationLevel, personal: boolean): bool
   if (level === NotificationLevel.OFF) return false;
   if (level === NotificationLevel.PERSONAL) return personal;
   return true;
-}
-
-/**
- * The filter for one tab of the bell dropdown.
- */
-export function notificationFilter(tab: NotificationTab) {
-  if (tab === "off") return { mutedAt: { not: null } };
-  if (tab === "personal") return { mutedAt: null, personal: true };
-  return { mutedAt: null };
 }
 
 /**
@@ -125,15 +112,11 @@ export async function notify({
 }
 
 /**
- * List the notifications of a user for one tab of the bell dropdown.
- *
- * - "all"      -> everything that is not muted
- * - "personal" -> only personal notifications that are not muted
- * - "off"      -> only muted notifications
+ * List the notifications of a user for the bell dropdown.
  */
-export async function getNotifications(userId: string, tab: NotificationTab) {
+export async function getNotifications(userId: string) {
   const notifications = await prisma.notification.findMany({
-    where: { userId, ...notificationFilter(tab) },
+    where: { userId },
     orderBy: { createdAt: "desc" },
     take: 50,
     include: {
@@ -151,7 +134,6 @@ export async function getNotifications(userId: string, tab: NotificationTab) {
     message: n.message,
     createdAt: n.createdAt.toISOString(),
     readAt: n.readAt?.toISOString() ?? null,
-    mutedAt: n.mutedAt?.toISOString() ?? null,
     postId: n.postId,
     commentId: n.commentId,
     actorName: n.actor?.profile?.name ?? "Anggota",
@@ -163,19 +145,14 @@ export async function getNotifications(userId: string, tab: NotificationTab) {
 }
 
 /**
- * Count the unread notifications per tab, for the bell badge.
+ * Count the unread notifications, for the bell badge.
  */
 export async function getUnreadCounts(userId: string) {
-  const [all, personal] = await Promise.all([
-    prisma.notification.count({
-      where: { userId, readAt: null, mutedAt: null },
-    }),
-    prisma.notification.count({
-      where: { userId, readAt: null, mutedAt: null, personal: true },
-    }),
-  ]);
+  const all = await prisma.notification.count({
+    where: { userId, readAt: null },
+  });
 
-  return { all, personal };
+  return { all };
 }
 
 /**
@@ -188,19 +165,5 @@ export async function markNotificationsRead(userId: string, id?: string) {
   await prisma.notification.updateMany({
     where: { userId, readAt: null, ...(id ? { id } : {}) },
     data: { readAt: new Date() },
-  });
-}
-
-/**
- * Mute or unmute a single notification.
- */
-export async function setNotificationMuted(
-  userId: string,
-  id: string,
-  muted: boolean
-) {
-  await prisma.notification.updateMany({
-    where: { id, userId },
-    data: { mutedAt: muted ? new Date() : null },
   });
 }

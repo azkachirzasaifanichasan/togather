@@ -1,7 +1,90 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import Image from "next/image";
 
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+
+const UPCOMING_EVENTS = [
+  {
+    id: "1",
+    title: "Tech Meetup Yogyakarta: AI & Web Development",
+    category: "Teknologi",
+    date: "Sabtu, 15 Nov • 10:00 WIB",
+    location: "Sleman, Yogyakarta",
+    price: "Free",
+    attendees: 48,
+    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "2",
+    title: "Sunrise Hiking & Merapi Nature Exploration",
+    category: "Olahraga",
+    date: "Minggu, 16 Nov • 05:00 WIB",
+    location: "Kaliurang, Sleman",
+    price: "Rp 50.000",
+    attendees: 32,
+    image: "https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "3",
+    title: "Jogja Creative Art & Batik Craft Workshop",
+    category: "Seni & Budaya",
+    date: "Sabtu, 22 Nov • 13:30 WIB",
+    location: "Kotagede, Yogyakarta",
+    price: "Free",
+    attendees: 24,
+    image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "4",
+    title: "Jogja Coffee Tasting & Barista Jam Session",
+    category: "Kuliner",
+    date: "Jumat, 28 Nov • 19:00 WIB",
+    location: "Prawirotaman, Yogyakarta",
+    price: "Rp 35.000",
+    attendees: 56,
+    image: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&auto=format&fit=crop&q=80",
+  },
+];
+
+const POPULAR_COMMUNITIES = [
+  {
+    name: "Tech Yogyakarta",
+    members: 1240,
+    category: "Teknologi",
+    image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=300&auto=format&fit=crop&q=80",
+  },
+  {
+    name: "Hiking DIY",
+    members: 856,
+    category: "Olahraga",
+    image: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=300&auto=format&fit=crop&q=80",
+  },
+  {
+    name: "Fotografi Jogja",
+    members: 2103,
+    category: "Seni & Hiburan",
+    image: "https://images.unsplash.com/photo-1452587925148-ce544e77e70d?w=300&auto=format&fit=crop&q=80",
+  },
+  {
+    name: "Startup Community",
+    members: 634,
+    category: "Bisnis & Karier",
+    image: "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=300&auto=format&fit=crop&q=80",
+  },
+  {
+    name: "Yoga & Wellness",
+    members: 421,
+    category: "Kesehatan",
+    image: "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=300&auto=format&fit=crop&q=80",
+  },
+  {
+    name: "Book Club Jogja",
+    members: 318,
+    category: "Hobi",
+    image: "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=300&auto=format&fit=crop&q=80",
+  },
+];
 
 export default async function LandingPage() {
   return (
@@ -118,32 +201,59 @@ export default async function LandingPage() {
 
           {/* Event Cards Grid */}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow cursor-pointer"
+            {UPCOMING_EVENTS.map((event) => (
+              <Link
+                key={event.id}
+                href="/event"
+                className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col"
               >
-                <div className="h-48 bg-gradient-to-br from-purple-400 to-pink-400"></div>
-                <div className="p-4">
-                  <div className="flex items-center gap-2 text-xs text-[#6B7280] mb-2">
-                    <span className="px-2 py-1 bg-purple-100 text-[#7960D7] rounded-full font-medium">
-                      Free
+                <div className="relative h-48 w-full overflow-hidden bg-gray-100">
+                  <Image
+                    src={event.image}
+                    alt={event.title}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                  />
+                  <div className="absolute top-3 left-3">
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full shadow-sm backdrop-blur-sm ${
+                      event.price === "Free" ? "bg-emerald-500/90 text-white" : "bg-white/95 text-[#7960D7]"
+                    }`}>
+                      {event.price}
                     </span>
                   </div>
-                  <h3 className="font-bold text-[#1F2937] mb-2 line-clamp-2">
-                    Tech Meetup Yogyakarta
-                  </h3>
-                  <p className="text-sm text-[#6B7280] mb-3">
-                    Sat, Dec 15 â€¢ 10:00 AM
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <span>24 attending</span>
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2.5 py-1 text-xs font-medium bg-black/60 backdrop-blur-sm text-white rounded-full">
+                      {event.category}
+                    </span>
                   </div>
                 </div>
-              </div>
+
+                <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-bold text-[#1F2937] mb-2 line-clamp-2 group-hover:text-[#7960D7] transition-colors leading-snug">
+                      {event.title}
+                    </h3>
+                    <p className="text-sm text-[#6B7280] mb-2">
+                      {event.date}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-xs text-[#6B7280] mb-3">
+                      <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="truncate">{event.location}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm text-[#6B7280] pt-3 border-t border-gray-100">
+                    <svg className="w-4 h-4 text-[#7960D7] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>{event.attendees} attending</span>
+                  </div>
+                </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -171,30 +281,29 @@ export default async function LandingPage() {
 
           {/* Community Cards Grid */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { name: "Tech Yogyakarta", members: 1240, category: "Teknologi", color: "bg-blue-500" },
-              { name: "Hiking DIY", members: 856, category: "Olahraga", color: "bg-green-500" },
-              { name: "Fotografi Jogja", members: 2103, category: "Seni & Hiburan", color: "bg-purple-500" },
-              { name: "Startup Community", members: 634, category: "Bisnis & Karier", color: "bg-orange-500" },
-              { name: "Yoga & Wellness", members: 421, category: "Kesehatan", color: "bg-pink-500" },
-              { name: "Book Club Jogja", members: 318, category: "Hobi", color: "bg-yellow-500" },
-            ].map((community, i) => (
+            {POPULAR_COMMUNITIES.map((community, i) => (
               <div
                 key={i}
-                className="bg-white border border-gray-200 rounded-xl p-6 hover:border-[#7960D7] hover:shadow-lg transition-all cursor-pointer"
+                className="group bg-white border border-gray-200 rounded-xl p-5 hover:border-[#7960D7] hover:shadow-lg transition-all cursor-pointer"
               >
-                <div className="flex items-start gap-4">
-                  <div className={`w-16 h-16 ${community.color} rounded-xl flex items-center justify-center text-white font-bold text-2xl`}>
-                    {community.name.charAt(0)}
+                <div className="flex items-center gap-4">
+                  <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 shadow-sm">
+                    <Image
+                      src={community.image}
+                      alt={community.name}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      sizes="64px"
+                    />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-[#1F2937] mb-1">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-[#1F2937] mb-1 truncate group-hover:text-[#7960D7] transition-colors">
                       {community.name}
                     </h3>
                     <p className="text-sm text-[#6B7280] mb-2">
                       {community.members.toLocaleString()} members
                     </p>
-                    <span className="inline-block px-2 py-1 bg-gray-100 text-[#6B7280] text-xs rounded-full">
+                    <span className="inline-block px-2.5 py-0.5 bg-purple-50 text-[#7960D7] text-xs font-medium rounded-full">
                       {community.category}
                     </span>
                   </div>
